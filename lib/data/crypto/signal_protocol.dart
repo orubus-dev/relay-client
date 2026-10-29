@@ -47,8 +47,8 @@ class SignKeyPair {
 Future<DhKeyPair> generateDhPair() async {
   final kp = await _x25519.newKeyPair();
   final priv = Uint8List.fromList(await kp.extractPrivateKeyBytes());
-  final pub = Uint8List.fromList(await kp.extractPublicKeyBytes());
-  return DhKeyPair(pub, priv);
+  final pub = await kp.extractPublicKey();
+  return DhKeyPair(Uint8List.fromList(pub.bytes), priv);
 }
 
 Future<Uint8List> dh(DhKeyPair mine, Uint8List remotePub) async {
@@ -67,8 +67,8 @@ Future<Uint8List> dh(DhKeyPair mine, Uint8List remotePub) async {
 Future<SignKeyPair> generateSignPair() async {
   final kp = await _ed25519.newKeyPair();
   final priv = Uint8List.fromList(await kp.extractPrivateKeyBytes());
-  final pub = Uint8List.fromList(await kp.extractPublicKeyBytes());
-  return SignKeyPair(pub, priv);
+  final pub = await kp.extractPublicKey();
+  return SignKeyPair(Uint8List.fromList(pub.bytes), priv);
 }
 
 Future<Uint8List> edSign(Uint8List msg, SignKeyPair keys) async {
@@ -524,8 +524,9 @@ const maxSkip = 200;
 const skippedCap = 400;
 
 void _storeSkipped(RatchetState state, String dhRemote, int until) {
-  var ck = state.ckReceiving == null ? null : B64u.decode(state.ckReceiving!);
-  if (ck == null) return;
+  Uint8List? ckMaybe = state.ckReceiving == null ? null : B64u.decode(state.ckReceiving!);
+  if (ckMaybe == null) return;
+  Uint8List ck = ckMaybe;
   for (var i = state.nReceiving; i < until; i++) {
     if (until - state.nReceiving > maxSkip) throw StateError('Too many skipped messages');
     final chain = kdfChainKey(ck);
