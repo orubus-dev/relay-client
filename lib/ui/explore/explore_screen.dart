@@ -314,7 +314,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> with SingleTicker
         width: 48,
         height: 48,
         decoration: BoxDecoration(
-          gradient: _gradientFor(s),
+          gradient: storyGradientFor(s),
           borderRadius: BorderRadius.circular(12),
         ),
         child: const Icon(Icons.text_fields_rounded, color: Colors.white, size: 20),
@@ -339,36 +339,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> with SingleTicker
     );
   }
 
-  LinearGradient _gradientFor(Map<String, dynamic> s) {
-    const presets = [
-      [0xFF667EEA, 0xFF764BA2],
-      [0xFFF093FB, 0xFFF5576C],
-      [0xFF4FACFE, 0xFF00F2FE],
-      [0xFF43E97B, 0xFF38F9D7],
-      [0xFFFA709A, 0xFFFEE140],
-      [0xFFA18CD1, 0xFFFBC2EB],
-    ];
-    final bg = (s['background_color'] ?? '').toString();
-    // background_color holds "color1|color2" hex pair from the composer
-    final parts = bg.split('|');
-    for (final pair in [parts]) {
-      if (pair.length == 2) {
-        try {
-          return LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(int.parse(pair[0])), Color(int.parse(pair[1]))],
-          );
-        } catch (_) {}
-      }
-    }
-    final idx = ((s['id'] ?? '').toString().hashCode.abs()) % presets.length;
-    return LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [Color(presets[idx][0]), Color(presets[idx][1])],
-    );
-  }
+
 
   Widget _storyRing({required String label, String? avatar, required Color accent, bool plus = false, bool seen = false, required VoidCallback onTap}) {
     return GestureDetector(
@@ -503,6 +474,37 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> with SingleTicker
 /// Global hook the HomeShell registers so any screen can open a conversation.
 void Function(String id, String title, String type)? relayOpenChatCallback;
 
+LinearGradient storyGradientFor(Map<String, dynamic> s) {
+  const presets = [
+    [0xFF667EEA, 0xFF764BA2],
+    [0xFFF093FB, 0xFFF5576C],
+    [0xFF4FACFE, 0xFF00F2FE],
+    [0xFF43E97B, 0xFF38F9D7],
+    [0xFFFA709A, 0xFFFEE140],
+    [0xFFA18CD1, 0xFFFBC2EB],
+  ];
+  final bg = (s['background_color'] ?? '').toString();
+  // background_color holds "color1|color2" hex pair from the composer
+  final parts = bg.split('|');
+  for (final pair in [parts]) {
+    if (pair.length == 2) {
+      try {
+        return LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(int.parse(pair[0])), Color(int.parse(pair[1]))],
+        );
+      } catch (_) {}
+    }
+  }
+  final idx = ((s['id'] ?? '').toString().hashCode.abs()) % presets.length;
+  return LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(presets[idx][0]), Color(presets[idx][1])],
+  );
+}
+
 // ================= immersive story viewer =================
 
 class _StoryViewer extends ConsumerStatefulWidget {
@@ -516,7 +518,7 @@ class _StoryViewer extends ConsumerStatefulWidget {
 
 class _StoryViewerState extends ConsumerState<_StoryViewer> {
   late PageController _pages = PageController(initialPage: widget.initialIndex);
-  int _index = widget.initialIndex;
+  late int _index = widget.initialIndex;
   Timer? _ticker;
   double _progress = 0;
   bool _paused = false;
@@ -701,7 +703,7 @@ class _StoryViewerState extends ConsumerState<_StoryViewer> {
   Widget _storyBody(Map<String, dynamic> s, String type) {
     if (type == 'text') {
       return Container(
-        decoration: BoxDecoration(gradient: _gradientFor(s)),
+        decoration: BoxDecoration(gradient: storyGradientFor(s)),
         alignment: Alignment.center,
         padding: const EdgeInsets.symmetric(horizontal: 28),
         child: Text(
@@ -718,7 +720,7 @@ class _StoryViewerState extends ConsumerState<_StoryViewer> {
     }
     if (type == 'voice') {
       return Container(
-        decoration: BoxDecoration(gradient: _gradientFor(s)),
+        decoration: BoxDecoration(gradient: storyGradientFor(s)),
         alignment: Alignment.center,
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -726,7 +728,7 @@ class _StoryViewerState extends ConsumerState<_StoryViewer> {
             const Icon(Icons.graphic_eq_rounded, color: Colors.white, size: 72),
             const SizedBox(height: 18),
             Text(
-              _fmtDur(Duration(seconds: (s['media_duration_ms'] ?? 0) as int ~/ 1000)),
+              _fmtDur(Duration(seconds: ((s['media_duration_ms'] ?? 0) as int) ~/ 1000)),
               style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800, fontFamily: 'monospace'),
             ),
             const SizedBox(height: 8),

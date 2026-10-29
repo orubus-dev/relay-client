@@ -321,7 +321,7 @@ class RelayApi {
     await sb.storage.from('story-media').upload(
           path,
           File(filePath),
-          fileOptions: const FileOptions(contentType: mime, upsert: false),
+          fileOptions: FileOptions(contentType: mime, upsert: false),
         );
     final signed = await sb.storage.from('story-media').createSignedUrl(path, 60 * 60 * 24);
     return signed;

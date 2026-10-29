@@ -130,11 +130,6 @@ class RelayTheme {
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
-      menuTheme: MenuThemeData(
-        color: highSurface,
-        surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      ),
       listTileTheme: ListTileThemeData(
         iconColor: isDark ? Colors.white70 : const Color(0xFF475569),
       ),
