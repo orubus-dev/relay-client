@@ -9,6 +9,10 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    env:
+      # flutter_inappwebview_windows still uses <experimental/coroutine>;
+      # MSVC 14.5x hard-errors without this silence define
+      CL: /D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS
     steps:
       - uses: actions/checkout@v4
 
