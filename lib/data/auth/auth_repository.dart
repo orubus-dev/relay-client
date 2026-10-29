@@ -75,7 +75,7 @@ class AuthRepository {
       final accessToken = session['access_token'] as String?;
       final refreshToken = session['refresh_token'] as String?;
       if (accessToken == null || refreshToken == null) return null;
-      await client.auth.setSession(accessToken, refreshToken);
+      await client.auth.setSession(jsonEncode(session));
       await _secure.write(key: _kSession, value: jsonEncode(session));
       final user = client.auth.currentUser;
       if (user == null) return null;

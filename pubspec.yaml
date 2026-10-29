@@ -30,7 +30,7 @@ dependencies:
   hive_flutter: ^1.1.0
   hive: ^2.2.3
   # media
-  record: ^5.2.0
+  record: ^7.1.2
   just_audio: ^0.9.39
   image_picker: ^1.1.2
   http: ^1.2.1

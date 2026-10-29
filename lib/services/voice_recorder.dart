@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:record/record.dart';
 
 /// Voice notes — WhatsApp interaction model: hold to record, slide up to lock,

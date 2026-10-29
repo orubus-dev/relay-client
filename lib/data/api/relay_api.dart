@@ -231,7 +231,7 @@ class RelayApi {
           event: PostgresChangeEvent.insert,
           schema: 'public',
           table: 'messages',
-          filter: PostgresChangeFilter(column: 'conversation_id', value: conversationId),
+          filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'conversation_id', value: conversationId),
           callback: (payload) => onInsert(Map<String, dynamic>.from(payload.newRecord)),
         )
         .subscribe();
@@ -244,7 +244,7 @@ class RelayApi {
           event: PostgresChangeEvent.insert,
           schema: 'public',
           table: 'notifications',
-          filter: PostgresChangeFilter(column: 'profile_id', value: profileId),
+          filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'profile_id', value: profileId),
           callback: (_) => onChange(),
         )
         .subscribe();

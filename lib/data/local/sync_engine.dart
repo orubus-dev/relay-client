@@ -65,7 +65,7 @@ class SyncEngine {
       String? mime;
       String? fileName = r['file_name'] as String?;
 
-      if (rawContent.isNotEmpty && (e2ee.isEnvelope(rawContent) || e2ee.isFanout(rawContent))) {
+      if (rawContent.isNotEmpty && (api.e2ee.isEnvelope(rawContent) || api.e2ee.isFanout(rawContent))) {
         try {
           final payloadJson = await e2ee.decryptAny(me, conversationId, senderId, rawContent);
           if (payloadJson == null) {
