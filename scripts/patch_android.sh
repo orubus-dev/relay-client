@@ -19,7 +19,7 @@ rm -f "$GRADLE_FILE.bak"
 
 # --- signing config (groovy) ---
 if [[ "$GRADLE_FILE" == *.gradle ]]; then
-  grep -q "KEYSTORE_PATH" "$GRADLE_FILE" || cat >> "$GRADLE_FILE" <<EOF
+  grep -q "KEYSTORE_PATH" "$GRADLE_FILE" || cat >> "$GRADLE_FILE" <<'EOF'
 
 // ==== Relay CI signing (appended by scripts/patch_android.sh) ====
 def keystoreEnvPath = System.getenv("KEYSTORE_PATH")
@@ -38,6 +38,34 @@ android {
         release {
             if (keystoreEnvPath != null) {
                 signingConfig signingConfigs.release
+            }
+        }
+    }
+}
+EOF
+fi
+
+# --- signing config (kotlin DSL) ---
+if [[ "$GRADLE_FILE" == *.kts ]]; then
+  grep -q "KEYSTORE_PATH" "$GRADLE_FILE" || cat >> "$GRADLE_FILE" <<'EOF'
+
+// ==== Relay CI signing (appended by scripts/patch_android.sh) ====
+val keystoreEnvPath: String? = System.getenv("KEYSTORE_PATH")
+android {
+    signingConfigs {
+        create("relayRelease") {
+            if (keystoreEnvPath != null) {
+                storeFile = file(keystoreEnvPath)
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
+        }
+    }
+    buildTypes {
+        release {
+            if (keystoreEnvPath != null) {
+                signingConfig = signingConfigs.getByName("relayRelease")
             }
         }
     }
