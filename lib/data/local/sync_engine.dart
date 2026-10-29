@@ -64,6 +64,9 @@ class SyncEngine {
       String? mediaKey;
       String? mime;
       String? fileName = r['file_name'] as String?;
+      String? replyToId;
+      String? replyToName;
+      String? replyToContent;
 
       if (rawContent.isNotEmpty && (api.e2ee.isEnvelope(rawContent) || api.e2ee.isFanout(rawContent))) {
         try {
@@ -82,6 +85,10 @@ class SyncEngine {
               mime = payload['mime'] as String?;
               fileName = (payload['name'] ?? fileName) as String?;
             }
+            // reply metadata rides inside the encrypted payload (r=id, rn=name, rt=snippet)
+            replyToId = payload['r'] as String?;
+            replyToName = payload['rn'] as String?;
+            replyToContent = payload['rt'] as String?;
           }
         } catch (_) {
           content = '🔒 Encrypted message (cannot decrypt on this device)';
@@ -101,9 +108,9 @@ class SyncEngine {
         'mime_type': mime,
         'file_name': fileName,
         'duration_seconds': null,
-        'reply_to_id': r['reply_to_message_id'],
-        'reply_to_name': null,
-        'reply_to_content': null,
+        'reply_to_id': replyToId ?? r['reply_to_message_id'],
+        'reply_to_name': replyToName,
+        'reply_to_content': replyToContent,
         'delivery_state': r['send_status'] ?? 'sent',
         'is_edited': r['is_edited'] ?? false,
         'is_deleted': r['is_deleted'] ?? false,

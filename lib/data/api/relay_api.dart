@@ -4,6 +4,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:supabase/supabase.dart';
 
 import '../../core/constants.dart';
@@ -129,7 +130,9 @@ class RelayApi {
 
   /// Client-side encrypted media upload — bucket stores AES-256-GCM ciphertext
   /// only; the key rides INSIDE the ratchet-encrypted message payload.
-  Future<Map<String, dynamic>> uploadEncryptedFile(String filePath, {String mime = 'audio/mp4'}) async {
+  /// File layout: [12-byte nonce][ciphertext][16-byte mac] — the nonce must
+  /// travel with the file or decryption is impossible.
+  Future<Map<String, dynamic>> uploadEncryptedFile(String filePath, {String mime = 'audio/mp4', String? storageName}) async {
     final me = myProfileId;
     if (me == null) throw StateError('Not signed in');
     final bytes = await _readFileBytes(filePath);
@@ -138,16 +141,61 @@ class RelayApi {
 
     final secretKey = SecretKey(key);
     final box = await AesGcm.with256bits().encrypt(bytes, secretKey: secretKey, nonce: iv);
-    final ciphertext = Uint8List.fromList([...box.cipherText, ...box.mac.bytes]);
+    final blob = Uint8List.fromList([...iv, ...box.cipherText, ...box.mac.bytes]);
 
-    final path = '$me/${DateTime.now().millisecondsSinceEpoch}_VoiceNote.m4a.enc';
+    final name = storageName ?? 'VoiceNote.m4a.enc';
+    final path = '$me/${DateTime.now().millisecondsSinceEpoch}_$name';
     await sb.storage.from('chat-media').uploadBinary(
           path,
-          ciphertext,
+          blob,
           fileOptions: const FileOptions(contentType: 'application/octet-stream', upsert: false),
         );
     final signed = await sb.storage.from('chat-media').createSignedUrl(path, 60 * 60 * 24 * 365);
     return {'url': signed, 'mediaKey': B64u.encode(key), 'size': bytes.length};
+  }
+
+  /// Download + decrypt chat media. Handles both layouts: new files carry a
+  /// leading nonce; legacy plaintext uploads (web client) decrypt to nothing —
+  /// those are returned untouched for direct playback.
+  Future<String> fetchPlayableFile(String url, String? keyB64u, String mime) async {
+    if (keyB64u == null || keyB64u.isEmpty) return url; // plaintext (web upload)
+    if (_playableCache[url] != null) return _playableCache[url]!;
+    final client = HttpClient();
+    final req = await client.getUrl(Uri.parse(url));
+    final res = await req.close();
+    final blob = await _readAllBytes(res);
+    client.close();
+    if (blob.length <= 28) return url; // too short to be [nonce][ct][mac]
+
+    final nonce = blob.sublist(0, 12);
+    final rest = blob.sublist(12);
+    final macLen = 16;
+    final cipherText = Uint8List.sublistView(rest, 0, rest.length - macLen);
+    final mac = Mac(Uint8List.sublistView(rest, rest.length - macLen));
+    final keyBytes = B64u.decode(keyB64u);
+    try {
+      final clear = await AesGcm.with256bits().decrypt(
+        SecretBox(cipherText, nonce: nonce, mac: mac),
+        secretKey: SecretKey(keyBytes),
+      );
+      final dir = await getTemporaryDirectory();
+      final f = File('${dir.path}/media_${DateTime.now().microsecondsSinceEpoch}.${mime.contains('mp4') ? 'm4a' : 'bin'}');
+      await f.writeAsBytes(clear);
+      _playableCache[url] = f.path;
+      return f.path;
+    } catch (_) {
+      return url; // fall back to direct playback
+    }
+  }
+
+  final Map<String, String> _playableCache = {};
+
+  Future<Uint8List> _readAllBytes(HttpClientResponse res) async {
+    final builder = BytesBuilder(copy: false);
+    await for (final chunk in res) {
+      builder.add(chunk);
+    }
+    return builder.toBytes();
   }
 
   // ---------------- communities / channels ----------------
@@ -201,6 +249,126 @@ class RelayApi {
   }
 
   Future<void> joinCommunity(String communityId) => sb.rpc('join_community', params: {'p_community_id': communityId});
+
+  Future<String> createDirectChat(String peerProfileId) async {
+    final data = await sb.rpc('get_or_create_direct_conversation', params: {'p_other_profile_id': peerProfileId});
+    return data as String;
+  }
+
+  // ---------------- explore / stories ----------------
+
+  Future<List<Map<String, dynamic>>> fetchPublicFeed({int limit = 24}) async {
+    final data = await sb.rpc('get_public_feed', params: {'p_limit': limit});
+    return (data as List? ?? []).cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>?> createPublicPost(String content) async {
+    final data = await sb.rpc('create_public_post', params: {'p_content': content, 'p_media_url': null, 'p_visibility': 'public'});
+    return data == null ? null : Map<String, dynamic>.from(data as Map);
+  }
+
+  Future<Map<String, dynamic>> togglePostLike(String postId) async {
+    final data = await sb.rpc('toggle_post_like', params: {'p_post_id': postId});
+    return Map<String, dynamic>.from(data as Map);
+  }
+
+  Future<List<Map<String, dynamic>>> fetchActiveStories() async {
+    try {
+      final data = await sb.rpc('get_active_stories');
+      return (data as List? ?? []).cast<Map<String, dynamic>>();
+    } catch (_) {
+      final rows = await sb
+          .from('stories')
+          .select('*, profiles:profile_id(username, display_name, avatar_url)')
+          .gt('expires_at', DateTime.now().toUtc().toIso8601String())
+          .order('created_at', ascending: false)
+          .limit(100);
+      return (rows as List).cast<Map<String, dynamic>>();
+    }
+  }
+
+  Future<Map<String, dynamic>> createStory({
+    required String type, // text | image | video | voice
+    String? caption,
+    String? mediaUrl,
+    String? backgroundColor,
+    String? textColor,
+    String? fontName,
+    int? durationMs,
+  }) async {
+    final data = await sb.rpc('create_story', params: {
+      'p_story_type': type,
+      'p_caption': caption,
+      'p_media_url': mediaUrl,
+      'p_privacy': 'everyone',
+      'p_background_color': backgroundColor,
+      'p_duration_hours': 24,
+      'p_duration_ms': durationMs,
+      'p_text_color': textColor,
+      'p_font_name': fontName,
+    });
+    return Map<String, dynamic>.from(data as Map);
+  }
+
+  /// Story media goes to the private `story-media` bucket (folder-per-user) and
+  /// is served through a 24h signed URL stored in `stories.media_url`.
+  Future<String> uploadStoryMedia(String filePath, {required bool isVideo}) async {
+    final me = myProfileId;
+    if (me == null) throw StateError('Not signed in');
+    final ext = isVideo ? 'mp4' : 'jpg';
+    final mime = isVideo ? 'video/mp4' : 'image/jpeg';
+    final path = '$me/story_${DateTime.now().millisecondsSinceEpoch}.$ext';
+    await sb.storage.from('story-media').upload(
+          path,
+          File(filePath),
+          fileOptions: const FileOptions(contentType: mime, upsert: false),
+        );
+    final signed = await sb.storage.from('story-media').createSignedUrl(path, 60 * 60 * 24);
+    return signed;
+  }
+
+  Future<void> recordStoryView(String storyId) =>
+      sb.rpc('record_story_view', params: {'p_story_id': storyId});
+
+  Future<List<Map<String, dynamic>>> searchProfiles(String query, {int limit = 20}) async {
+    final me = myProfileId;
+    final q = query.trim();
+    if (q.isEmpty) return [];
+    final rows = await sb
+        .from('profiles')
+        .select('id, username, display_name, full_name, avatar_url, status')
+        .or('username.ilike.%$q%,display_name.ilike.%$q%,full_name.ilike.%$q%')
+        .limit(limit);
+    return (rows as List)
+        .cast<Map<String, dynamic>>()
+        .where((r) => r['id'] != me)
+        .toList();
+  }
+
+  // ---------------- voice channels (occupancy v1, mirrors web) ----------------
+
+  Future<void> setVoicePresence(String communityId, String? channelId) async {
+    final me = myProfileId;
+    if (me == null) return;
+    await sb.from('user_presence').upsert({
+      'profile_id': me,
+      'voice_channel_id': channelId,
+      'voice_community_id': channelId != null ? communityId : null,
+      'heartbeat_at': DateTime.now().toUtc().toIso8601String(),
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }, onConflict: 'profile_id');
+  }
+
+  Future<List<Map<String, dynamic>>> fetchVoiceOccupants(String channelId) async {
+    final cutoff = DateTime.now().toUtc().subtract(const Duration(minutes: 2)).toIso8601String();
+    final rows = await sb
+        .from('user_presence')
+        .select('profile_id, profiles:profile_id(display_name, username, avatar_url)')
+        .eq('voice_channel_id', channelId)
+        .gte('heartbeat_at', cutoff);
+    return (rows as List).cast<Map<String, dynamic>>();
+  }
+
 
   // ---------------- notifications ----------------
 
