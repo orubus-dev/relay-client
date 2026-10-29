@@ -52,8 +52,13 @@ Future<DhKeyPair> generateDhPair() async {
 }
 
 Future<Uint8List> dh(DhKeyPair mine, Uint8List remotePub) async {
+  final keyPair = SimpleKeyPairData(
+    mine.privateKey,
+    publicKey: SimplePublicKey(mine.publicKey, type: KeyPairType.x25519),
+    type: KeyPairType.x25519,
+  );
   final shared = await _x25519.sharedSecretKey(
-    keyPair: SimpleKeyPair(mine.privateKey, mine.privateKey, type: KeyPairType.x25519),
+    keyPair: keyPair,
     remotePublicKey: SimplePublicKey(remotePub, type: KeyPairType.x25519),
   );
   return Uint8List.fromList(await shared.extractBytes());
@@ -69,7 +74,11 @@ Future<SignKeyPair> generateSignPair() async {
 Future<Uint8List> edSign(Uint8List msg, SignKeyPair keys) async {
   final sig = await _ed25519.sign(
     msg,
-    keyPair: SimpleKeyPair(keys.privateKey, keys.privateKey, type: KeyPairType.ed25519),
+    keyPair: SimpleKeyPairData(
+      keys.privateKey,
+      publicKey: SimplePublicKey(keys.publicKey, type: KeyPairType.ed25519),
+      type: KeyPairType.ed25519,
+    ),
   );
   return Uint8List.fromList(sig.bytes);
 }
@@ -310,7 +319,7 @@ class RatchetHeader {
 class Envelope {
   final int v;
   final String s;
-  final Map<String, dynamic>? pre; // {ek, spkId, opkId}
+  Map<String, dynamic>? pre; // {ek, spkId, opkId}
   final String dh;
   final int pn;
   final int n;
@@ -545,7 +554,7 @@ Future<void> _dhRatchetStep(RatchetState state, String theirNewDhPub) async {
   state.nSending = 0;
   state.nReceiving = 0;
   state.dhRemote = theirNewDhPub;
-  final step1 = kdfRootKey(B64u.decode(state.rootKey), await dh(DhKeyPair(B64u.decode(state.dhSelf['pub']!), B64u.decode(state.dhSelf['priv']!)), B64u.decode(theirNewDhPub)));
+  final step1 = kdfRootKey(B64u.decode(state.rootKey), await dh(DhKeyPair(B64u.decode(state.dhSelf['pub'] ?? ''), B64u.decode(state.dhSelf['priv'] ?? '')), B64u.decode(theirNewDhPub)));
   state.rootKey = B64u.encode(step1.rootKey);
   state.ckReceiving = B64u.encode(step1.chainKey);
   final newSelf = await generateDhPair();

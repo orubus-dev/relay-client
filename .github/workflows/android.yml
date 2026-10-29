@@ -44,6 +44,12 @@ jobs:
       - name: Pub get
         run: flutter pub get
 
+      # AGP 8.10+ rejects proguard-android.txt inside flutter_inappwebview_android 1.1.3
+      - name: Patch plugin proguard flag (AGP compat)
+        run: |
+          FILE="$HOME/.pub-cache/hosted/pub.dev/flutter_inappwebview_android-1.1.3/android/build.gradle"
+          [ -f "$FILE" ] && sed -i "s/getDefaultProguardFile('proguard-android.txt')/getDefaultProguardFile('proguard-android-optimize.txt')/" "$FILE" || true
+
       - name: Build APK (signed)
         if: steps.keystore.outputs.present == 'true'
         env:
