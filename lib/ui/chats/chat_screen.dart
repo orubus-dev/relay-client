@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:realtime_client/realtime_client.dart';
 import 'package:record/record.dart';
 import 'package:just_audio/just_audio.dart';
 

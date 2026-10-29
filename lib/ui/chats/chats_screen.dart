@@ -20,7 +20,7 @@ class _ChatsScreenState extends ConsumerState<ChatsScreen> {
     setState(() => _syncing = true);
     try {
       await ref.read(syncEngineProvider).bootstrap();
-      ref.read(chatsControllerProvider).reload();
+      ref.read(chatsControllerProvider.notifier).reload();
     } finally {
       if (mounted) setState(() => _syncing = false);
     }
@@ -151,7 +151,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => ref.read(notificationsControllerProvider).reload());
+    WidgetsBinding.instance.addPostFrameCallback((_) => ref.read(notificationsControllerProvider.notifier).reload());
   }
 
   @override
@@ -163,7 +163,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         actions: [
           if (items.any((n) => n['is_read'] == false))
             TextButton(
-              onPressed: () => ref.read(notificationsControllerProvider).markAllRead(),
+              onPressed: () => ref.read(notificationsControllerProvider.notifier).markAllRead(),
               child: const Text('Mark all read'),
             ),
         ],
@@ -191,7 +191,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                       ? Container(width: 8, height: 8, decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary, shape: BoxShape.circle))
                       : null,
                   onTap: () {
-                    ref.read(notificationsControllerProvider).markAllRead();
+                    ref.read(notificationsControllerProvider.notifier).markAllRead();
                     Navigator.of(context).pop();
                   },
                 );

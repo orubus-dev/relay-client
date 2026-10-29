@@ -6,9 +6,9 @@ import 'dart:typed_data';
 import 'package:cryptography/cryptography.dart';
 import 'package:supabase/supabase.dart';
 
-import '../core/constants.dart';
-import '../data/crypto/e2ee_service.dart';
-import '../util/encoding.dart';
+import '../../core/constants.dart';
+import '../crypto/e2ee_service.dart';
+import '../../util/encoding.dart';
 
 /// Thin API layer over the same Supabase backend the web client uses.
 /// All chat content flows through the E2EE service — the server only ever

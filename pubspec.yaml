@@ -24,13 +24,13 @@ dependencies:
   cryptography: ^2.7.0
   convert: ^3.1.1
   # auth via WebView (Continue with Google just works — no native OAuth setup)
-  flutter_inappwebview: ^6.0.0
+  flutter_inappwebview: ^6.1.5
   # storage
   flutter_secure_storage: ^9.2.2
   hive_flutter: ^1.1.0
   hive: ^2.2.3
   # media
-  record: ^5.1.1
+  record: ^5.2.0
   just_audio: ^0.9.39
   image_picker: ^1.1.2
   http: ^1.2.1

@@ -151,7 +151,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ref.read(apiProvider).myProfileId!,
                       {'username': _usernameCtrl.text.trim().toLowerCase()},
                     );
-                    await ref.read(authControllerProvider).refreshProfile();
+                    await ref.read(authControllerProvider.notifier).refreshProfile();
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Username saved')));
                     }
@@ -162,7 +162,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           const SizedBox(height: 28),
           OutlinedButton.icon(
             style: OutlinedButton.styleFrom(foregroundColor: Colors.redAccent),
-            onPressed: () => ref.read(authControllerProvider).signOut(),
+            onPressed: () => ref.read(authControllerProvider.notifier).signOut(),
             icon: const Icon(Icons.logout_rounded, size: 18),
             label: const Text('Sign out'),
           ),

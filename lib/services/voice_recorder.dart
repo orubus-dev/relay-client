@@ -7,6 +7,9 @@ class VoiceRecorder {
 
   Future<bool> hasPermission() => _recorder.hasPermission();
 
+  /// Stream mode: subscribe FIRST (record 5.x contract), then start with no path.
+  Stream<Uint8List> stream() => _recorder.stream();
+
   Future<void> start() async {
     await _recorder.start(
       const RecordConfig(
@@ -15,11 +18,9 @@ class VoiceRecorder {
         sampleRate: 44100,
         numChannels: 1,
       ),
-      path: null, // stream mode — caller drains via stream()
+      path: null,
     );
   }
-
-  Stream<Uint8ListX> stream() => _recorder.stream().map(Uint8ListX.new);
 
   Future<String?> stop() => _recorder.stop();
 
@@ -30,5 +31,3 @@ class VoiceRecorder {
 
   Future<void> dispose() => _recorder.dispose();
 }
-
-typedef Uint8ListX = List<int>;

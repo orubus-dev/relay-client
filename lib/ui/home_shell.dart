@@ -34,10 +34,10 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(chatsControllerProvider).reload();
-      ref.read(notificationsControllerProvider).reload();
+      ref.read(chatsControllerProvider.notifier).reload();
+      ref.read(notificationsControllerProvider.notifier).reload();
       ref.read(syncEngineProvider).subscribeNotificationsRealtime(() {
-        ref.read(notificationsControllerProvider).reload();
+        ref.read(notificationsControllerProvider.notifier).reload();
       });
     });
   }
@@ -48,7 +48,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       _openChatTitle = title;
       _openChatType = type;
     });
-    ref.read(chatsControllerProvider).markReadAndReload(id);
+    ref.read(chatsControllerProvider.notifier).markReadAndReload(id);
   }
 
   @override

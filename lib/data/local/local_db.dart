@@ -106,15 +106,15 @@ class LocalDb {
 
   /// Insert messages, skipping duplicates. Returns how many were NEW.
   int insertMessages(List<Map<String, Object?>> msgs) {
-    final stmt = _d.prepare('''
+    const insertSql = '''
       INSERT OR IGNORE INTO messages (id, chat_id, sender_id, sender_name, sender_avatar,
         type, content, media_url, media_key, mime_type, file_name, duration_seconds,
         reply_to_id, reply_to_name, reply_to_content, delivery_state, is_edited, is_deleted, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''');
+    ''';
     var inserted = 0;
     for (final m in msgs) {
-      stmt.executeWith([
+      _d.execute(insertSql, [
         m['id'], m['chat_id'], m['sender_id'], m['sender_name'], m['sender_avatar'],
         m['type'] ?? 'text', m['content'], m['media_url'], m['media_key'], m['mime_type'],
         m['file_name'], m['duration_seconds'], m['reply_to_id'], m['reply_to_name'],
@@ -123,7 +123,6 @@ class LocalDb {
       ]);
       if (_d.updatedRows > 0) inserted++;
     }
-    stmt.dispose();
     return inserted;
   }
 
@@ -178,9 +177,4 @@ class LocalDb {
   Future<void> wipe() async {
     _d.execute('DELETE FROM messages; DELETE FROM chats; DELETE FROM sync_cursor;');
   }
-}
-
-/// Extract a typed helper on Statement for positional binding.
-extension _StmtX on Statement {
-  void executeWith(List<Object?> params) => execute(params);
 }

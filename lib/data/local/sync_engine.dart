@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:realtime_client/realtime_client.dart';
 import 'package:supabase/supabase.dart';
 
 import '../api/relay_api.dart';

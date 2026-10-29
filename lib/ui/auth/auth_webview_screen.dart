@@ -29,16 +29,6 @@ class _AuthWebViewScreenState extends State<AuthWebViewScreen> {
   @override
   void initState() {
     super.initState();
-    // register the session bridge
-    InAppWebViewController.addJavaScriptHandler(
-      handlerName: AuthRepository.jsHandlerName,
-      callback: (args) async {
-        if (args.isNotEmpty && args.first is String) {
-          await _handleSessionJson(args.first as String);
-        }
-        return null;
-      },
-    );
   }
 
   Future<void> _handleSessionJson(String sessionJson) async {

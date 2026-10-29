@@ -35,7 +35,8 @@ class _Root extends ConsumerWidget {
     }
     if (!auth.signedIn) {
       return AuthWebViewScreen(
-        onAuthenticated: (profile) => ref.read(authControllerProvider).onWebViewSession(profile),
+        auth: ref.read(authRepositoryProvider),
+        onAuthenticated: (profile) => ref.read(authControllerProvider.notifier).onWebViewSession(profile),
       );
     }
     return const HomeShell();
@@ -53,7 +54,7 @@ class _SplashState extends ConsumerState<_Splash> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() => ref.read(authControllerProvider).bootstrap());
+    Future.microtask(() => ref.read(authControllerProvider.notifier).bootstrap());
   }
 
   @override
