@@ -98,7 +98,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             children: [
               for (final a in kAccents)
                 GestureDetector(
-                  onTap: () => ref.read(themeControllerProvider).setAccent(a.value),
+                  onTap: () => ref.read(themeControllerProvider.notifier).setAccent(a.value),
                   child: Container(
                     width: 42,
                     height: 42,
@@ -122,7 +122,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               for (final m in kThemeModes) ButtonSegment(value: m.id, label: Text(m.label, style: const TextStyle(fontSize: 11))),
             ],
             selected: {theme.themeModeId},
-            onSelectionChanged: (s) => ref.read(themeControllerProvider).setThemeMode(s.first),
+            onSelectionChanged: (s) => ref.read(themeControllerProvider.notifier).setThemeMode(s.first),
           ),
           const SizedBox(height: 20),
 

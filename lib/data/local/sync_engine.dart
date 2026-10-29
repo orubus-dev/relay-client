@@ -67,7 +67,7 @@ class SyncEngine {
 
       if (rawContent.isNotEmpty && (api.e2ee.isEnvelope(rawContent) || api.e2ee.isFanout(rawContent))) {
         try {
-          final payloadJson = await e2ee.decryptAny(me, conversationId, senderId, rawContent);
+          final payloadJson = await api.e2ee.decryptAny(me, conversationId, senderId, rawContent);
           if (payloadJson == null) {
             content = '🔒 Encrypted message';
           } else {

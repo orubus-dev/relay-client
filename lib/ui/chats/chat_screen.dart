@@ -172,7 +172,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   Future<void> _onMicUp() async {
     if (_locked) return; // locked keeps recording (WhatsApp behavior)
-    final held = _pressStart == null ? 0 : DateTime.now().difference(_pressStart!);
+    final held = _pressStart == null ? Duration.zero : DateTime.now().difference(_pressStart!);
     if (held < const Duration(milliseconds: 700)) {
       await _cancelRecording();
       setState(() => _hint = 'Hold the mic to record');
@@ -322,7 +322,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       onHorizontalDragEnd: (d) {
         if ((d.primaryVelocity ?? 0) > 250) {
           _composer.text = '${m['sender_name'] ?? ''}: ${m['content']}';
-          FocusScope.of(context).attach();
         }
       },
       child: Padding(
@@ -398,7 +397,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               IconButton.filled(
                 icon: const Icon(Icons.send_rounded),
                 onPressed: _sendText,
-                style: IconButton.filled.styleFrom(backgroundColor: accent),
+                style: FilledButton.styleFrom(backgroundColor: accent),
               ),
           ],
         ),
