@@ -39,6 +39,9 @@ android {
             if (keystoreEnvPath != null) {
                 signingConfig signingConfigs.release
             }
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 }
@@ -67,10 +70,30 @@ android {
             if (keystoreEnvPath != null) {
                 signingConfig = signingConfigs.getByName("relayRelease")
             }
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 }
 EOF
+fi
+
+# permissive keep rules — the app ships shrunk but every Flutter plugin stays intact
+PROGUARD_FILE="$(dirname "$GRADLE_FILE")/proguard-rules.pro"
+if [ ! -f "$PROGUARD_FILE" ]; then
+  cat > "$PROGUARD_FILE" <<'PROGUARD_EOF'
+# Relay R8 rules: keep Flutter + plugin entrypoints; strip the rest
+-keep class io.flutter.app.** { *; }
+-keep class io.flutter.plugin.** { *; }
+-keep class io.flutter.util.** { *; }
+-keep class io.flutter.view.** { *; }
+-keep class io.flutter.** { *; }
+-keep class com.pichillilorenzo.** { *; }
+-dontwarn com.pichillilorenzo.**
+-keep class app.orubus.relay.** { *; }
+-keepattributes *Annotation*
+PROGUARD_EOF
 fi
 
 echo "patched $GRADLE_FILE (id: $APP_ID)"

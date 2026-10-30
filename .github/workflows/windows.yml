@@ -29,6 +29,10 @@ jobs:
       - name: Flutter create (idempotent)
         run: flutter create . --platforms windows --org app.orubus --project-name relay_client
 
+      # regenerate the app icon into the fresh runner resources every build
+      - name: Generate app icon
+        run: dart run flutter_launcher_icons
+
       - name: Pub get
         run: flutter pub get
 
