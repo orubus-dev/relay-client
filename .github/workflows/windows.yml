@@ -31,7 +31,7 @@ jobs:
 
       # regenerate the app icon into the fresh runner resources every build
       - name: Generate app icon
-        run: dart run flutter_launcher_icons
+        run: dart run flutter_launcher_icons -f flutter_launcher_icons_windows.yaml
 
       - name: Pub get
         run: flutter pub get
