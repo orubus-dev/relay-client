@@ -39,6 +39,10 @@ android {
             if (keystoreEnvPath != null) {
                 signingConfig signingConfigs.release
             }
+            // flutter 3.47 template enables R8 by default — a plugin fails
+            // minifyReleaseWithR8, so force it off (size comes from split-per-abi)
+            minifyEnabled false
+            shrinkResources false
         }
     }
 }
@@ -67,6 +71,8 @@ android {
             if (keystoreEnvPath != null) {
                 signingConfig = signingConfigs.getByName("relayRelease")
             }
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }
