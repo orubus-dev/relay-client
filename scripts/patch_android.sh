@@ -39,9 +39,6 @@ android {
             if (keystoreEnvPath != null) {
                 signingConfig signingConfigs.release
             }
-            minifyEnabled true
-            shrinkResources true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 }
@@ -70,9 +67,6 @@ android {
             if (keystoreEnvPath != null) {
                 signingConfig = signingConfigs.getByName("relayRelease")
             }
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 }
