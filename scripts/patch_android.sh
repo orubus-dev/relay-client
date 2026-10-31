@@ -141,6 +141,16 @@ android {
             isShrinkResources = false
         }
     }
+    // v1 (JAR) keeps META-INF signatures visible to lenient third-party
+    // installers; v2/v3 cover Android 7+ and key rotation. Without v1 some
+    // installer apps report a perfectly valid v2 APK as "unsigned".
+    signingConfigs {
+        named("relayRelease") {
+            enableV1Signing = true
+            enableV2Signing = true
+            enableV3Signing = true
+        }
+    }
 }
 EOF
 fi

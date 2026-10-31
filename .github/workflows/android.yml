@@ -102,6 +102,10 @@ jobs:
           if [ -f build/app/outputs/bundle/release/app-release.aab ]; then
             cp build/app/outputs/bundle/release/app-release.aab "out/relay-${VER}-android.aab"
           fi
+          # SHA-256 manifest — lets any installer/user prove the download
+          # is intact (a corrupted download is the #1 cause of
+          # "Unsigned or corrupted APK" on third-party installers)
+          (cd out && sha256sum * > SHA256SUMS.txt)
           ls -la out/
 
       - uses: actions/upload-artifact@v4
