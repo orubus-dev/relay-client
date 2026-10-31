@@ -233,48 +233,52 @@ class E2eeService {
     final identity = await ensureIdentity(myProfileId);
     final key = _sKey(conversationId, peerProfileId);
     var state = _sessionCache[key] ?? await store.getSession(myProfileId, conversationId, peerProfileId);
-    final hadExisting = state != null;
 
-    // Envelopes sealed to a PREVIOUS identity of this account can never open
-    // here — refuse before any session-building can persist garbage.
-    if (state == null && env.pre != null && env.pre!['spkId'] != null) {
-      final envSpkId = (env.pre!['spkId'] as num).toInt();
-      if (envSpkId != identity.spkId) {
+    // Pristine copy of the persisted session. Failed decrypt attempts MUTATE
+    // the ratchet state in place (dh ratchet steps, chain advances) — a sweep
+    // over old undecryptable messages used to corrupt the live session, after
+    // which every new message failed. Only successful decrypts commit.
+    RatchetState? snapshot;
+    if (state != null) {
+      snapshot = RatchetState.fromJson(jsonDecode(jsonEncode(state.toJson())) as Map<String, dynamic>);
+    }
+
+    final envelopeTargetsCurrentIdentity =
+        env.pre == null || env.pre!['spkId'] == null || (env.pre!['spkId'] as num).toInt() == identity.spkId;
+
+    RatchetState? candidate = state;
+    if (candidate == null && env.pre != null) {
+      if (!envelopeTargetsCurrentIdentity) {
         throw StateError('prekey envelope targets a previous identity (spk mismatch)');
       }
+      candidate = await _sessionFromPrekeyMessage(myProfileId, conversationId, peerProfileId, env);
     }
-    if (state == null && env.pre != null) {
-      state = await _sessionFromPrekeyMessage(myProfileId, conversationId, peerProfileId, env);
-    }
-    if (state == null) throw StateError('No session for conversation');
+    if (candidate == null) throw StateError('No session for conversation');
     try {
-      final pt = await ratchetDecrypt(state, conversationId, env);
-      // Verified good — only NOW touch the persisted session.
-      await store.setSession(myProfileId, conversationId, peerProfileId, state);
-      _sessionCache[key] = state;
+      final pt = await ratchetDecrypt(candidate, conversationId, env);
+      // Verified good — commit the evolved state.
+      await store.setSession(myProfileId, conversationId, peerProfileId, candidate);
+      _sessionCache[key] = candidate;
       return pt;
     } catch (err) {
+      // Restore the pristine persisted session first — failed attempts leave no trace.
+      if (snapshot != null) {
+        await store.setSession(myProfileId, conversationId, peerProfileId, snapshot);
+        _sessionCache[key] = snapshot;
+      } else {
+        await store.deleteSession(myProfileId, conversationId, peerProfileId);
+        _sessionCache.remove(key);
+      }
       final msg = err.toString();
       if (msg.contains('replay/underflow')) rethrow;
-      if (env.pre != null) {
-        final backup = state;
-        try {
-          _sessionCache.remove(key);
-          final fresh = await _sessionFromPrekeyMessage(myProfileId, conversationId, peerProfileId, env);
-          final pt2 = await ratchetDecrypt(fresh, conversationId, env);
-          await store.setSession(myProfileId, conversationId, peerProfileId, fresh);
-          _sessionCache[key] = fresh;
-          return pt2;
-        } catch (_) {
-          if (hadExisting) {
-            await store.setSession(myProfileId, conversationId, peerProfileId, backup);
-            _sessionCache[key] = backup;
-          } else {
-            await store.deleteSession(myProfileId, conversationId, peerProfileId);
-            _sessionCache.remove(key);
-          }
-          rethrow;
-        }
+      // A prekey (first-contact) message that still fails means the peer
+      // re-initiated against our CURRENT identity — rebuild once and retry.
+      if (env.pre != null && envelopeTargetsCurrentIdentity) {
+        final fresh = await _sessionFromPrekeyMessage(myProfileId, conversationId, peerProfileId, env);
+        final pt2 = await ratchetDecrypt(fresh, conversationId, env);
+        await store.setSession(myProfileId, conversationId, peerProfileId, fresh);
+        _sessionCache[key] = fresh;
+        return pt2;
       }
       rethrow;
     }
