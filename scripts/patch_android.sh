@@ -17,6 +17,20 @@ sed -i.bak -E "s|namespace = \"[^\"]+\"|namespace = \"$APP_ID\"|g; s|namespace '
 sed -i.bak -E "s|applicationId = \"[^\"]+\"|applicationId = \"$APP_ID\"|g; s|applicationId \"[^\"]+\"|applicationId \"$APP_ID\"|g" "$GRADLE_FILE"
 rm -f "$GRADLE_FILE.bak"
 
+# --- launcher label: the app drawer must say "Relay", not the flutter
+#     create project name ("relay_client") ---
+MANIFEST="android/app/src/main/AndroidManifest.xml"
+if [ -f "$MANIFEST" ]; then
+  sed -i.bak -E 's|android:label="relay_client"|android:label="Relay"|g; s|android:label="[a-z_]+"|android:label="Relay"|g' "$MANIFEST"
+  rm -f "$MANIFEST.bak"
+  grep -q 'android:label="Relay"' "$MANIFEST" || echo "::warning::failed to set android:label=Relay"
+fi
+STRINGS="android/app/src/main/res/values/strings.xml"
+if [ -f "$STRINGS" ]; then
+  sed -i.bak -E 's|<string name="app_name">[^<]*</string>|<string name="app_name">Relay</string>|' "$STRINGS"
+  rm -f "$STRINGS.bak"
+fi
+
 # --- signing config (groovy) ---
 if [[ "$GRADLE_FILE" == *.gradle ]]; then
   grep -q "KEYSTORE_PATH" "$GRADLE_FILE" || cat >> "$GRADLE_FILE" <<'EOF'

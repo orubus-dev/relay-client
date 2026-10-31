@@ -70,6 +70,19 @@ class _AuthWebViewScreenState extends State<AuthWebViewScreen> {
           userAgent: 'RelayClient/1.0 (${RelayConfig.packageName})',
           supportZoom: false,
         ),
+        // The web login page hands the session back via relay://login#… (a
+        // custom scheme a WebView cannot navigate to — it used to surface as
+        // ERR_UNKNOWN_URL_SCHEME / "a format the WebView can't understand").
+        // Intercept it here instead: parse the tokens and capture the session
+        // without any navigation.
+        shouldOverrideUrlLoading: (controller, navigationAction) async {
+          final url = navigationAction.request.url.toString();
+          if (url.startsWith('relay://')) {
+            _handleRelaySchemeUrl(url);
+            return NavigationActionPolicy.CANCEL;
+          }
+          return NavigationActionPolicy.ALLOW;
+        },
         onWebViewCreated: (controller) {
           _controller = controller;
           controller.addJavaScriptHandler(
@@ -96,5 +109,24 @@ class _AuthWebViewScreenState extends State<AuthWebViewScreen> {
         onProgressChanged: (controller, progress) => setState(() => _progress = progress / 100),
       ),
     );
+  }
+
+  /// relay://login#access_token=…&refresh_token=… (also tolerates ?query form
+  /// and relay://auth). Extracts the Supabase tokens and completes sign-in.
+  Future<void> _handleRelaySchemeUrl(String url) async {
+    try {
+      final uri = Uri.parse(url.replaceFirst('relay://', 'https://relay.invalid/'));
+      final params = <String, String>{
+        ...uri.queryParameters,
+        if (uri.fragment.isNotEmpty) ...Uri.queryParameters(uri.fragment),
+      };
+      final access = params['access_token'];
+      final refresh = params['refresh_token'];
+      if (access == null || refresh == null || access.isEmpty) return;
+      final sessionJson = jsonEncode({'access_token': access, 'refresh_token': refresh});
+      await _handleSessionJson(sessionJson);
+    } catch (_) {
+      // malformed handoff — the localStorage bridge remains the fallback
+    }
   }
 }
