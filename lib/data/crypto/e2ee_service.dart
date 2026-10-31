@@ -281,9 +281,11 @@ class E2eeService {
       }
       final msg = err.toString();
       if (msg.contains('replay/underflow')) rethrow;
-      // A prekey (first-contact) message that still fails means the peer
-      // re-initiated against our CURRENT identity — rebuild once and retry.
-      if (env.pre != null && envelopeTargetsCurrentIdentity) {
+      // Deterministic convergence: the peer with the GREATER profile id is the
+      // reset authority. The lower side adopts the peer's re-initiation; the
+      // greater side ignores it and re-initiates its own (via the caller's
+      // session-reset protocol).
+      if (env.pre != null && envelopeTargetsCurrentIdentity && peerProfileId.compareTo(myProfileId) > 0) {
         final fresh = await _sessionFromPrekeyMessage(myProfileId, conversationId, peerProfileId, env);
         final pt2 = await ratchetDecrypt(fresh, conversationId, env);
         await store.setSession(myProfileId, conversationId, peerProfileId, fresh);

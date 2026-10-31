@@ -11,6 +11,7 @@ import 'local_db.dart';
 /// only contributes NEW messages (first open pulls history once, after that
 /// only rows newer than the cursor, plus realtime INSERTs).
 class SyncEngine {
+  final Map<String, int> _resetCooldownUntil = {};
   final RelayApi api;
   final LocalDb db;
   RealtimeChannel? _notifChannel;
@@ -96,12 +97,18 @@ class SyncEngine {
           }
         } on RelaySessionDead {
           content = '🔒 Encrypted message (cannot decrypt on this device)';
-          // Session-reset protocol: re-initiate with a silent control envelope
-          // so BOTH sides converge instead of failing forever.
-          try {
-            final wire = await api.e2ee.buildSessionResetWire(me, conversationId, senderId);
-            await api.sendWireRaw(conversationId, senderId, wire);
-          } catch (_) {/* retried on next failure */}
+          // Session-reset protocol with a per-pair cooldown — repeated syncs
+          // over old dead rows must not re-trigger reset rounds forever.
+          final cooldownKey = '$conversationId:$senderId';
+          final now = DateTime.now().millisecondsSinceEpoch;
+          final last = _resetCooldownUntil[cooldownKey] ?? 0;
+          if (now >= last) {
+            _resetCooldownUntil[cooldownKey] = now + 45000;
+            try {
+              final wire = await api.e2ee.buildSessionResetWire(me, conversationId, senderId);
+              await api.sendWireRaw(conversationId, senderId, wire);
+            } catch (_) {/* retried after cooldown */}
+          }
         } catch (_) {
           content = '🔒 Encrypted message (cannot decrypt on this device)';
         }
