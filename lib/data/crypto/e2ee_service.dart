@@ -163,6 +163,14 @@ class E2eeService {
     }
   }
 
+  /// Build a session from an incoming prekey message (responder side).
+  ///
+  /// NOTE: does NOT persist the built session — the caller must only persist
+  /// it after ratchetDecrypt actually succeeds. Persisting an unverified
+  /// responder session poisoned the store whenever the envelope was sealed to
+  /// a previous identity (spk/opk mismatch): the wrong shared secret got
+  /// stored and every later send reused the broken session (bare envelopes,
+  /// no `pre` block) the peer could never decrypt.
   Future<RatchetState> _sessionFromPrekeyMessage(
     String myProfileId,
     String conversationId,
@@ -187,8 +195,6 @@ class E2eeService {
     );
     final state = await initRatchetAsResponder(shared, identity.spk);
     state.peerIk = env.s;
-    await store.setSession(myProfileId, conversationId, peerProfileId, state);
-    _sessionCache[_sKey(conversationId, peerProfileId)] = state;
     return state;
   }
 
@@ -224,26 +230,35 @@ class E2eeService {
 
   /// Decrypt an envelope from [peerProfileId] (the sender).
   Future<String> decryptFor(String myProfileId, String conversationId, String peerProfileId, Envelope env) async {
-    await ensureIdentity(myProfileId);
+    final identity = await ensureIdentity(myProfileId);
     final key = _sKey(conversationId, peerProfileId);
     var state = _sessionCache[key] ?? await store.getSession(myProfileId, conversationId, peerProfileId);
     final hadExisting = state != null;
+
+    // Envelopes sealed to a PREVIOUS identity of this account can never open
+    // here — refuse before any session-building can persist garbage.
+    if (state == null && env.pre != null && env.pre!['spkId'] != null) {
+      final envSpkId = (env.pre!['spkId'] as num).toInt();
+      if (envSpkId != identity.spkId) {
+        throw StateError('prekey envelope targets a previous identity (spk mismatch)');
+      }
+    }
     if (state == null && env.pre != null) {
       state = await _sessionFromPrekeyMessage(myProfileId, conversationId, peerProfileId, env);
     }
     if (state == null) throw StateError('No session for conversation');
     try {
       final pt = await ratchetDecrypt(state, conversationId, env);
+      // Verified good — only NOW touch the persisted session.
       await store.setSession(myProfileId, conversationId, peerProfileId, state);
       _sessionCache[key] = state;
       return pt;
     } catch (err) {
       final msg = err.toString();
       if (msg.contains('replay/underflow')) rethrow;
-      if (env.pre != null && hadExisting) {
+      if (env.pre != null) {
         final backup = state;
         try {
-          await store.deleteSession(myProfileId, conversationId, peerProfileId);
           _sessionCache.remove(key);
           final fresh = await _sessionFromPrekeyMessage(myProfileId, conversationId, peerProfileId, env);
           final pt2 = await ratchetDecrypt(fresh, conversationId, env);
@@ -251,8 +266,13 @@ class E2eeService {
           _sessionCache[key] = fresh;
           return pt2;
         } catch (_) {
-          await store.setSession(myProfileId, conversationId, peerProfileId, backup);
-          _sessionCache[key] = backup;
+          if (hadExisting) {
+            await store.setSession(myProfileId, conversationId, peerProfileId, backup);
+            _sessionCache[key] = backup;
+          } else {
+            await store.deleteSession(myProfileId, conversationId, peerProfileId);
+            _sessionCache.remove(key);
+          }
           rethrow;
         }
       }
