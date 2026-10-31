@@ -76,6 +76,10 @@ class SyncEngine {
           } else {
             final payload = jsonDecode(payloadJson) as Map<String, dynamic>;
             final kind = payload['k'];
+            if (kind == 'r') {
+              // Session-reset control message — protocol plumbing, never stored.
+              continue;
+            }
             if (kind == 't' || kind == 's') {
               content = (payload['t'] ?? '') as String;
             } else if (kind == 'm') {
@@ -90,6 +94,14 @@ class SyncEngine {
             replyToName = payload['rn'] as String?;
             replyToContent = payload['rt'] as String?;
           }
+        } on RelaySessionDead {
+          content = '🔒 Encrypted message (cannot decrypt on this device)';
+          // Session-reset protocol: re-initiate with a silent control envelope
+          // so BOTH sides converge instead of failing forever.
+          try {
+            final wire = await api.e2ee.buildSessionResetWire(me, conversationId, senderId);
+            await api.sendWireRaw(conversationId, senderId, wire);
+          } catch (_) {/* retried on next failure */}
         } catch (_) {
           content = '🔒 Encrypted message (cannot decrypt on this device)';
         }

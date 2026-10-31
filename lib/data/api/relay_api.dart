@@ -121,6 +121,22 @@ class RelayApi {
     return res == null ? null : Map<String, dynamic>.from(res as Map);
   }
 
+  /// Send an already-encrypted wire payload to ONE peer — used by the
+  /// session-reset protocol ({k:'r'} control envelope).
+  Future<Map<String, dynamic>?> sendWireRaw(String conversationId, String peerProfileId, String wire) async {
+    final res = await sb.rpc('send_conversation_message', params: {
+      'p_conversation_id': conversationId,
+      'p_recipient_profile_id': peerProfileId,
+      'p_content': wire,
+      'p_message_type': 'text',
+      'p_reply_to_message_id': null,
+      'p_media_url': null,
+      'p_file_name': null,
+      'p_is_forwarded': false,
+    });
+    return res == null ? null : Map<String, dynamic>.from(res as Map);
+  }
+
   Future<void> markRead(String conversationId) async {
     await sb.rpc('mark_messages_status', params: {
       'p_conversation_id': conversationId,

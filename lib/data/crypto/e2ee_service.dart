@@ -6,6 +6,16 @@ import '../../core/constants.dart';
 import '../../util/encoding.dart';
 import 'signal_protocol.dart';
 
+/// Thrown when an envelope can never be decrypted on this device (bare
+/// continuation of a session we don't share, or sealed to an identity we no
+/// longer hold). The caller kicks the session-reset protocol.
+class RelaySessionDead implements Exception {
+  final String message;
+  RelaySessionDead([this.message = 'session unrecoverable']);
+  @override
+  String toString() => 'RelaySessionDead: $message';
+}
+
 /// Orchestration: identity registration, per-(conversation, peer) sessions,
 /// R1 single envelopes (DMs) and R2 fan-out envelopes (groups/channels).
 /// Mirrors the web client's cryptoService.ts — messages interop both ways.
@@ -249,11 +259,11 @@ class E2eeService {
     RatchetState? candidate = state;
     if (candidate == null && env.pre != null) {
       if (!envelopeTargetsCurrentIdentity) {
-        throw StateError('prekey envelope targets a previous identity (spk mismatch)');
+        throw RelaySessionDead('prekey envelope targets a previous identity (spk mismatch)');
       }
       candidate = await _sessionFromPrekeyMessage(myProfileId, conversationId, peerProfileId, env);
     }
-    if (candidate == null) throw StateError('No session for conversation');
+    if (candidate == null) throw RelaySessionDead('no session for conversation');
     try {
       final pt = await ratchetDecrypt(candidate, conversationId, env);
       // Verified good — commit the evolved state.
@@ -280,8 +290,19 @@ class E2eeService {
         _sessionCache[key] = fresh;
         return pt2;
       }
-      rethrow;
+      // Unrecoverable locally — the session-reset protocol re-syncs both devices.
+      throw RelaySessionDead('bare envelope undecryptable: $msg');
     }
+  }
+
+  /// Session-reset protocol: drop the local session, initiate a fresh X3DH
+  /// against the peer's CURRENT prekey bundle, and return the sealed {k:'r'}
+  /// control envelope (carries a `pre` block) for the caller to send. The peer
+  /// rebuilds from the header and both sides converge on the same keys.
+  Future<String> buildSessionResetWire(String myProfileId, String conversationId, String peerProfileId) async {
+    await store.deleteSession(myProfileId, conversationId, peerProfileId);
+    _sessionCache.remove(_sKey(conversationId, peerProfileId));
+    return encryptFor(myProfileId, conversationId, peerProfileId, jsonEncode({'k': 'r'}));
   }
 
   /// Decrypt either wire format; returns null when this device has no envelope.
