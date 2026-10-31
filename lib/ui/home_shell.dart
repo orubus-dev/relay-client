@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -10,9 +8,12 @@ import 'communities/communities_screen.dart';
 import 'explore/explore_screen.dart';
 import 'profile/profile_screen.dart';
 
-/// WhatsApp-style shell. The bottom nav is a real liquid-glass bar: backdrop
-/// blur + saturation (refraction), specular top highlight, accent-tinted
-/// selection pill. It hides completely while a conversation is open.
+/// WhatsApp-style shell. The bottom nav keeps the liquid-glass LOOK
+/// (frosted tint, specular top highlight, accent selection pill) but drops the
+/// live BackdropFilter — a 22-sigma realtime blur re-renders the whole list
+/// beneath it every frame, which on mid/low-end GPUs stalls the raster
+/// pipeline until scrolling feels broken. A translucent tint + hairline reads
+/// the same and costs nothing. It hides completely while a conversation open.
 class HomeShell extends ConsumerStatefulWidget {
   const HomeShell({super.key});
 
@@ -67,6 +68,16 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       );
     }
 
+    // real unread total across chats — the badge used to be hardwired to 0
+    final chats = ref.watch(chatsControllerProvider);
+    var unread = 0;
+    for (final c in chats) {
+      final v = c['unread_count'];
+      if (v is int) unread += v;
+      if (v is num) unread += v.toInt();
+      if (v is String) unread += int.tryParse(v) ?? 0;
+    }
+
     return Scaffold(
       extendBody: true,
       body: IndexedStack(
@@ -81,26 +92,26 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       bottomNavigationBar: _GlassNavBar(
         destinations: _destinations,
         currentIndex: _tab,
-        unreadBadge: _tab == 0 ? 0 : null,
+        unreadBadge: unread,
         onSelect: (i) => setState(() => _tab = i),
       ),
     );
   }
 }
 
-/// Liquid-glass navigation bar — blur + saturation refraction over the content
-/// behind it, a hairline specular edge, and an accent pill for the active tab.
+/// Liquid-glass-look navigation bar — frosted tint + specular edge + accent
+/// pill. No BackdropFilter: scrolling stays 60fps even on budget devices.
 class _GlassNavBar extends ConsumerStatefulWidget {
   final List<(IconData, String)> destinations;
   final int currentIndex;
-  final int? unreadBadge;
+  final int unreadBadge;
   final ValueChanged<int> onSelect;
 
   const _GlassNavBar({
     required this.destinations,
     required this.currentIndex,
     required this.onSelect,
-    this.unreadBadge,
+    this.unreadBadge = 0,
   });
 
   @override
@@ -114,10 +125,10 @@ class _GlassNavBarState extends ConsumerState<_GlassNavBar> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // Glass tint: light mode = bright frosted white, dark = deep translucent
-    // slate. Both let the blurred, saturated backdrop bend through.
+    // slate. Opaque enough to read labels over any content.
     final glassTint = isDark
-        ? const Color(0xFF0B1220).withOpacity(0.62)
-        : Colors.white.withOpacity(0.66);
+        ? const Color(0xFF0B1220).withOpacity(0.86)
+        : Colors.white.withOpacity(0.88);
     final edgeHighlight = isDark ? Colors.white.withOpacity(0.16) : Colors.white.withOpacity(0.9);
     final hairline = isDark ? Colors.white.withOpacity(0.10) : const Color(0xFF0F172A).withOpacity(0.08);
 
@@ -125,52 +136,48 @@ class _GlassNavBarState extends ConsumerState<_GlassNavBar> {
       top: false,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(26),
-          child: BackdropFilter(
-            // Refraction: heavy blur + saturation so colors behind the glass
-            // visibly bleed through, like the web app's liquid-panel.
-            filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+        child: Container(
+          decoration: BoxDecoration(
+            color: glassTint,
+            borderRadius: BorderRadius.circular(26),
+            border: Border.all(color: hairline, width: 0.8),
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [glassTint, (isDark ? const Color(0xFF0B1220) : Colors.white).withOpacity(0.55)],
+            ),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(isDark ? 0.45 : 0.10), blurRadius: 24, offset: const Offset(0, 8)),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(26),
             child: Container(
               decoration: BoxDecoration(
-                color: glassTint,
                 borderRadius: BorderRadius.circular(26),
-                border: Border.all(color: hairline, width: 0.8),
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [glassTint, (isDark ? const Color(0xFF0B1220) : Colors.white).withOpacity(0.35)],
+                  colors: [edgeHighlight, edgeHighlight.withOpacity(0.0)],
+                  stops: const [0, 0.12],
                 ),
-                boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(isDark ? 0.45 : 0.10), blurRadius: 24, offset: const Offset(0, 8)),
-                ],
               ),
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(26),
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [edgeHighlight, edgeHighlight.withOpacity(0.0)],
-                    stops: const [0, 0.12],
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    for (var i = 0; i < widget.destinations.length; i++)
-                      Expanded(
-                        child: _GlassTab(
-                          icon: widget.destinations[i].$1,
-                          label: widget.destinations[i].$2,
-                          selected: widget.currentIndex == i,
-                          accent: accent,
-                          isDark: isDark,
-                          showBadge: i == 0 && (widget.unreadBadge ?? 0) > 0,
-                          onTap: () => widget.onSelect(i),
-                        ),
+              child: Row(
+                children: [
+                  for (var i = 0; i < widget.destinations.length; i++)
+                    Expanded(
+                      child: _GlassTab(
+                        icon: widget.destinations[i].$1,
+                        label: widget.destinations[i].$2,
+                        selected: widget.currentIndex == i,
+                        accent: accent,
+                        isDark: isDark,
+                        showBadge: i == 0 && widget.unreadBadge > 0,
+                        badgeCount: widget.unreadBadge,
+                        onTap: () => widget.onSelect(i),
                       ),
-                  ],
-                ),
+                    ),
+                ],
               ),
             ),
           ),
@@ -187,6 +194,7 @@ class _GlassTab extends StatelessWidget {
   final Color accent;
   final bool isDark;
   final bool showBadge;
+  final int badgeCount;
   final VoidCallback onTap;
 
   const _GlassTab({
@@ -197,6 +205,7 @@ class _GlassTab extends StatelessWidget {
     required this.isDark,
     required this.onTap,
     this.showBadge = false,
+    this.badgeCount = 0,
   });
 
   @override
@@ -229,12 +238,26 @@ class _GlassTab extends StatelessWidget {
                 ),
                 if (showBadge)
                   Positioned(
-                    top: -3,
-                    right: 8,
+                    top: -4,
+                    right: 4,
                     child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 1.2)),
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      constraints: const BoxConstraints(minWidth: 15),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent,
+                        borderRadius: BorderRadius.circular(9),
+                        border: Border.all(color: isDark ? const Color(0xFF0B1220) : Colors.white, width: 1.2),
+                      ),
+                      child: Text(
+                        badgeCount > 99 ? '99+' : '$badgeCount',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 8.5,
+                          height: 1.25,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
                     ),
                   ),
               ],

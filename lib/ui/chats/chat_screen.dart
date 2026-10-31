@@ -263,6 +263,70 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
+  // ---------------- emoji picker (the button used to be a no-op) ----------------
+
+  static const _emojiSheet = [
+    '😀','😂','🥹','😍','😘','😎','🤔','😴','🙄','😭','🤗','🤝',
+    '👍','👎','👏','🙏','💪','🔥','❤️','💔','✨','🎉','🥳','😴',
+    '😢','😡','🤯','🥰','😇','🤩','😋','🤪','😬','🫡','🤫','🫠',
+    '💯','✅','❌','⚡','🌈','☀️','🌙','⭐','🍕','☕','🏀','⚽',
+  ];
+
+  void _showEmojiSheet(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? const Color(0xFF16202F) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 14, 12, 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Emoji',
+                  style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A))),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 208,
+                child: GridView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 8,
+                    mainAxisSpacing: 2,
+                    crossAxisSpacing: 2,
+                  ),
+                  itemCount: _emojiSheet.length,
+                  itemBuilder: (_, i) => GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      final sel = _composer.selection;
+                      final base = sel.baseOffset >= 0 ? sel.baseOffset : _composer.text.length;
+                      final t = _composer.text;
+                      final next = t.substring(0, base) + _emojiSheet[i] + t.substring(base);
+                      _composer.value = TextEditingValue(
+                        text: next,
+                        selection: TextSelection.collapsed(offset: base + _emojiSheet[i].length),
+                      );
+                    },
+                    child: Center(
+                      child: Text(_emojiSheet[i], style: const TextStyle(fontSize: 24)),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   // ---------------- hold-to-record (WhatsApp flow) ----------------
 
   Future<void> _onMicDown(PointerDownEvent e) async {
@@ -738,7 +802,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       children: [
                         IconButton(
                           icon: Icon(Icons.emoji_emotions_outlined, color: Theme.of(context).hintColor, size: 22),
-                          onPressed: () {},
+                          onPressed: () => _showEmojiSheet(context),
                         ),
                         Expanded(
                           child: TextField(

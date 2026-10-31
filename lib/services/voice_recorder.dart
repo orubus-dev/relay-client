@@ -18,32 +18,35 @@ class VoiceRecorder {
   /// Cached last-resolved state so the UI can react without a round-trip.
   MicPermission lastKnown = MicPermission.denied;
 
-  /// OS-level microphone check. On Android this uses permission_handler
-  /// (deterministic checkSelfPermission semantics). The `record` plugin's own
-  /// check returns false whenever its activity binding is absent — that was
-  /// the "says microphone permission required while permission is enabled"
-  /// false negative. Windows has no permission_handler implementation; there
-  /// we still defer to the recorder's check.
+  /// OS-level microphone check. permission_handler is the single source of
+  /// truth on every platform (the `record` plugin's own check returns false
+  /// whenever its activity binding is absent — that was the classic "says
+  /// microphone permission required while permission is enabled" false
+  /// negative). If permission_handler itself fails, we fall back to the
+  /// recorder check so the hint can never be a hard false negative.
   Future<MicPermission> resolvePermission({bool request = true}) async {
-    if (Platform.isAndroid) {
+    try {
       final status = await Permission.microphone.status;
       if (status.isGranted) return lastKnown = MicPermission.granted;
       if (status.isPermanentlyDenied || status.isRestricted) {
         return lastKnown = MicPermission.blocked;
       }
       if (!request) return lastKnown = MicPermission.denied;
+      // request() returns instantly (no dialog) when the OS has already
+      // granted the permission — so an enabled mic can never read as denied.
       final after = await Permission.microphone.request();
       if (after.isGranted) return lastKnown = MicPermission.granted;
       if (after.isPermanentlyDenied || after.isRestricted) {
         return lastKnown = MicPermission.blocked;
       }
       return lastKnown = MicPermission.denied;
-    }
-    try {
-      final ok = await _recorder.hasPermission();
-      return lastKnown = ok ? MicPermission.granted : MicPermission.denied;
     } catch (_) {
-      return lastKnown = MicPermission.denied;
+      try {
+        final ok = await _recorder.hasPermission();
+        return lastKnown = ok ? MicPermission.granted : MicPermission.denied;
+      } catch (_) {
+        return lastKnown = MicPermission.denied;
+      }
     }
   }
 

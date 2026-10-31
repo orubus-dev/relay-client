@@ -91,6 +91,7 @@ class LocalDb {
   // ---------------- chats ----------------
 
   void upsertChat(Map<String, Object?> chat) {
+    if (!isReady) return;
     _d.execute('''
       INSERT INTO chats (id, name, type, avatar_url, last_message_text, last_message_at,
         last_message_sender_id, unread_count, request_status, is_pinned, updated_at)
@@ -112,11 +113,19 @@ class LocalDb {
     ]);
   }
 
+  /// True when the database opened successfully — UI checks this instead of
+  /// crashing on an unguarded `_d` access.
+  bool get isReady => _db != null;
+
   void clearUnread(String chatId) {
+    if (!isReady) return;
     _d.execute('UPDATE chats SET unread_count = 0 WHERE id = ?', [chatId]);
   }
 
   List<Map<String, Object?>> listChats() {
+    // a dead db must degrade to an empty list, never throw inside a
+    // postFrameCallback (that used to be a guaranteed launch crash)
+    if (!isReady) return const [];
     final rows = _d.select('SELECT * FROM chats ORDER BY COALESCE(last_message_at, updated_at) DESC');
     return rows.map((r) => r).toList();
   }
@@ -125,6 +134,7 @@ class LocalDb {
 
   /// Insert messages, skipping duplicates. Returns how many were NEW.
   int insertMessages(List<Map<String, Object?>> msgs) {
+    if (!isReady) return 0;
     const insertSql = '''
       INSERT OR IGNORE INTO messages (id, chat_id, sender_id, sender_name, sender_avatar,
         type, content, media_url, media_key, mime_type, file_name, duration_seconds,
@@ -146,10 +156,12 @@ class LocalDb {
   }
 
   void updateMessageDelivery(String messageId, String state) {
+    if (!isReady) return;
     _d.execute('UPDATE messages SET delivery_state = ? WHERE id = ?', [state, messageId]);
   }
 
   List<Map<String, Object?>> listMessages(String chatId, {int limit = 500}) {
+    if (!isReady) return const [];
     return _d
         .select('SELECT * FROM messages WHERE chat_id = ? AND is_deleted = 0 ORDER BY created_at ASC LIMIT ?',
             [chatId, limit])
@@ -159,6 +171,7 @@ class LocalDb {
   // ---------------- sync cursor ----------------
 
   ({String? lastSyncedAt, bool historyLoaded}) cursorFor(String chatId) {
+    if (!isReady) return (lastSyncedAt: null, historyLoaded: false);
     final rows = _d.select('SELECT last_synced_at, history_loaded FROM sync_cursor WHERE chat_id = ?', [chatId]);
     if (rows.isEmpty) return (lastSyncedAt: null, historyLoaded: false);
     return (
@@ -168,6 +181,7 @@ class LocalDb {
   }
 
   void saveCursor(String chatId, {String? lastSyncedAt, bool? historyLoaded}) {
+    if (!isReady) return;
     final c = cursorFor(chatId);
     _d.execute('''
       INSERT INTO sync_cursor (chat_id, last_synced_at, history_loaded) VALUES (?, ?, ?)
@@ -185,11 +199,13 @@ class LocalDb {
   // ---------------- kv / identity of the account ----------------
 
   String? kvGet(String key) {
+    if (!isReady) return null;
     final rows = _d.select('SELECT v FROM kv WHERE k = ?', [key]);
     return rows.isEmpty ? null : rows.first['v'] as String?;
   }
 
   void kvSet(String key, String value) {
+    if (!isReady) return;
     _d.execute('INSERT INTO kv (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = ?', [key, value, value]);
   }
 

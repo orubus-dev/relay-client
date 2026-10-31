@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:just_audio/just_audio.dart';
 import '../../services/voice_recorder.dart';
 
 import '../../state/providers.dart';
@@ -517,11 +518,11 @@ class _StoryViewer extends ConsumerStatefulWidget {
 }
 
 class _StoryViewerState extends ConsumerState<_StoryViewer> {
-  late PageController _pages = PageController(initialPage: widget.initialIndex);
   late int _index = widget.initialIndex;
   Timer? _ticker;
   double _progress = 0;
   bool _paused = false;
+  AudioPlayer? _voicePlayer;
 
   @override
   void initState() {
@@ -529,6 +530,7 @@ class _StoryViewerState extends ConsumerState<_StoryViewer> {
     _startProgress();
     final me = ref.read(apiProvider).myProfileId;
     _markViewed(widget.stories[_index], me);
+    _syncVoicePlayback();
   }
 
   void _startProgress() {
@@ -560,9 +562,9 @@ class _StoryViewerState extends ConsumerState<_StoryViewer> {
       return;
     }
     setState(() => _index += 1);
-    _pages.animateToPage(_index, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
     _startProgress();
     _markViewed(widget.stories[_index], ref.read(apiProvider).myProfileId);
+    _syncVoicePlayback();
   }
 
   void _prev() {
@@ -572,14 +574,43 @@ class _StoryViewerState extends ConsumerState<_StoryViewer> {
       return;
     }
     setState(() => _index -= 1);
-    _pages.jumpToPage(_index);
     _startProgress();
+    _syncVoicePlayback();
+  }
+
+  /// Voice stories actually PLAY now (they used to be a static icon).
+  Future<void> _syncVoicePlayback() async {
+    final s = widget.stories[_index];
+    final type = (s['story_type'] ?? 'text').toString();
+    final url = (s['media_url'] ?? '').toString();
+    try {
+      if (type != 'voice' || url.isEmpty) {
+        await _voicePlayer?.stop();
+        return;
+      }
+      _voicePlayer ??= AudioPlayer();
+      await _voicePlayer!.setUrl(url);
+      if (!_paused) await _voicePlayer!.play();
+    } catch (_) {
+      // missing/expired media — the visual still renders
+    }
+  }
+
+  void _setPaused(bool v) {
+    setState(() => _paused = v);
+    final p = _voicePlayer;
+    if (p == null) return;
+    if (v) {
+      p.pause();
+    } else {
+      p.play();
+    }
   }
 
   @override
   void dispose() {
     _ticker?.cancel();
-    _pages.dispose();
+    _voicePlayer?.dispose();
     super.dispose();
   }
 
@@ -608,8 +639,8 @@ class _StoryViewerState extends ConsumerState<_StoryViewer> {
             _prev();
           }
         },
-        onLongPressStart: (_) => setState(() => _paused = true),
-        onLongPressEnd: (_) => setState(() => _paused = false),
+        onLongPressStart: (_) => _setPaused(true),
+        onLongPressEnd: (_) => _setPaused(false),
         onVerticalDragEnd: (d) {
           if ((d.primaryVelocity ?? 0) > 120) Navigator.of(context).pop();
         },
@@ -719,20 +750,38 @@ class _StoryViewerState extends ConsumerState<_StoryViewer> {
       );
     }
     if (type == 'voice') {
+      final playing = !_paused;
       return Container(
         decoration: BoxDecoration(gradient: storyGradientFor(s)),
         alignment: Alignment.center,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.graphic_eq_rounded, color: Colors.white, size: 72),
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                if (playing)
+                  SizedBox(
+                    width: 120,
+                    height: 120,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 3,
+                      valueColor: const AlwaysStoppedAnimation(Colors.white38),
+                      backgroundColor: Colors.white12,
+                    ),
+                  ),
+                Icon(playing ? Icons.graphic_eq_rounded : Icons.pause_circle_outline_rounded,
+                    color: Colors.white, size: 72),
+              ],
+            ),
             const SizedBox(height: 18),
             Text(
               _fmtDur(Duration(seconds: ((s['media_duration_ms'] ?? 0) as int) ~/ 1000)),
               style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800, fontFamily: 'monospace'),
             ),
             const SizedBox(height: 8),
-            const Text('Voice status', style: TextStyle(color: Colors.white70, fontSize: 12)),
+            Text(playing ? 'Playing voice status · hold to pause' : 'Paused · release to play',
+                style: const TextStyle(color: Colors.white70, fontSize: 12)),
           ],
         ),
       );

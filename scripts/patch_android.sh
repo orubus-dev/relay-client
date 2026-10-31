@@ -19,6 +19,41 @@ rm -f "$GRADLE_FILE.bak"
 
 # --- launcher label: the app drawer must say "Relay", not the flutter
 #     create project name ("relay_client") ---
+# Drop the forced NDK requirement — no externalNativeBuild/jni code exists;
+# AGP then skips symbol stripping instead of pulling a 3GB NDK.
+APP_GRADLE="android/app/build.gradle.kts"
+if [ -f "$APP_GRADLE" ]; then
+  sed -i.bak 's|^\s*ndkVersion = .*||' "$APP_GRADLE"; rm -f "$APP_GRADLE.bak"
+fi
+
+# -all -> -bin wrapper dist (the -all dist is 700MB with sources/docs)
+WPROPS="android/gradle/wrapper/gradle-wrapper.properties"
+if [ -f "$WPROPS" ]; then
+  sed -i.bak 's|-all.zip|-bin.zip|' "$WPROPS"; rm -f "$WPROPS.bak"
+fi
+
+GP="android/gradle.properties"
+if [ -f "$GP" ] && ! grep -q "org.gradle.jvmargs" "$GP"; then
+  cat >> "$GP" <<'GPEOF'
+
+# memory caps for constrained CI runners (4GB)
+org.gradle.jvmargs=-Xmx1536m -XX:MaxMetaspaceSize=512m
+kotlin.daemon.jvmargs=-Xmx1024m
+kotlin.compiler.execution.strategy=in-process
+org.gradle.workers.max=1
+org.gradle.parallel=false
+GPEOF
+  echo "patched gradle.properties (memory caps)"
+fi
+
+SETTINGS="android/settings.gradle.kts"
+if [ -f "$SETTINGS" ] && ! grep -q "maven-central.storage-download" "$SETTINGS"; then
+  # mirror-first plugin resolution: Maven Central 429s behind shared egress IPs
+  sed -i.bak 's|repositories {|repositories {\n        maven("https://maven-central.storage-download.googleapis.com/maven2/")|' "$SETTINGS"
+  rm -f "$SETTINGS.bak"
+  grep -q "maven-central.storage-download" "$SETTINGS" && echo "patched settings.gradle.kts (central mirror first)" || echo "::warning::failed to patch settings repos"
+fi
+
 MANIFEST="android/app/src/main/AndroidManifest.xml"
 if [ -f "$MANIFEST" ]; then
   sed -i.bak -E 's|android:label="relay_client"|android:label="Relay"|g; s|android:label="[a-z_]+"|android:label="Relay"|g' "$MANIFEST"
@@ -32,6 +67,14 @@ if [ -f "$MANIFEST" ]; then
     sed -i.bak 's|<manifest xmlns:android="http://schemas.android.com/apk/res/android">|<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n\n    <uses-permission android:name="android.permission.RECORD_AUDIO" />|' "$MANIFEST"
     rm -f "$MANIFEST.bak"
     grep -q 'android.permission.RECORD_AUDIO' "$MANIFEST" && echo "patched RECORD_AUDIO into manifest" || echo "::warning::failed to add RECORD_AUDIO"
+  fi
+
+  # INTERNET: belt-and-braces (the webview plugin normally merges it; a
+  # manifest without it = a silent offline app)
+  if ! grep -q 'android.permission.INTERNET' "$MANIFEST"; then
+    sed -i.bak 's|<manifest xmlns:android="http://schemas.android.com/apk/res/android">|<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n    <uses-permission android:name="android.permission.INTERNET" />|' "$MANIFEST"
+    rm -f "$MANIFEST.bak"
+    grep -q 'android.permission.INTERNET' "$MANIFEST" && echo "patched INTERNET into manifest" || echo "::warning::failed to add INTERNET"
   fi
 fi
 STRINGS="android/app/src/main/res/values/strings.xml"
