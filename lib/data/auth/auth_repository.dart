@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:gotrue/gotrue.dart' show AuthApiException, AuthException, AuthRetryableFetchError;
+import 'package:gotrue/gotrue.dart' show AuthApiException;
 import 'package:supabase/supabase.dart';
 
 import '../../core/constants.dart';
@@ -82,9 +82,14 @@ class AuthRepository {
       final cached = await cachedProfile();
       return cached ?? {'id': user.id}; // may lack a profile row — UI degrades gracefully
     } catch (e) {
-      final isAuthRejection = e is AuthApiException ||
-          (e is AuthException && e is! AuthRetryableFetchError) ||
-          _looksLikeAuthRejection(e.toString());
+      // A transient failure (offline / timeout / 5xx) surfaces as a plain
+      // network error or a retryable auth fetch error — neither carries an
+      // API status code. Only an AuthApiException (the auth server actually
+      // REJECTED the refresh) or an explicit rejection message clears the
+      // stored session. Network errors never match, so airplane mode keeps
+      // the user signed in.
+      final isAuthRejection =
+          e is AuthApiException || _looksLikeAuthRejection(e.toString());
       if (!isAuthRejection) {
         // transient (offline / timeout / 5xx): enter with the cached session
         try {
