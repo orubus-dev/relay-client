@@ -212,7 +212,7 @@ class _CommunitiesScreenState extends ConsumerState<CommunitiesScreen> {
                       leading: CircleAvatar(
                         backgroundImage: c['avatar_url'] != null ? NetworkImage(c['avatar_url'] as String) : null,
                         child: c['avatar_url'] == null
-                            ? Text(((c['name'] ?? '') as String).isEmpty ? 'C' : (c['name'] as String).trim().substring(0, 1).toUpperCase().toUpperCase())
+                            ? Text(_initialOf(c['name'] as String?, 'C'))
                             : null,
                       ),
                       title: Text((c['name'] ?? '') as String, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
@@ -401,7 +401,7 @@ class _CommunitySettingsScreenState extends ConsumerState<_CommunitySettingsScre
                 backgroundImage: widget.community['avatar_url'] != null ? NetworkImage(widget.community['avatar_url'] as String) : null,
                 backgroundColor: accent.withOpacity(0.16),
                 child: widget.community['avatar_url'] == null
-                    ? Text(((widget.community['name'] ?? '') as String).isEmpty ? 'C' : (widget.community['name'] as String).trim().substring(0, 1).toUpperCase().toUpperCase(),
+                    ? Text(_initialOf(widget.community['name'] as String?, 'C'),
                         style: TextStyle(color: accent, fontWeight: FontWeight.w800, fontSize: 20))
                     : null,
               ),
@@ -443,7 +443,7 @@ class _CommunitySettingsScreenState extends ConsumerState<_CommunitySettingsScre
                       : null,
                   backgroundColor: accent.withOpacity(0.12),
                   child: ((m['profiles'] as Map?)?['avatar_url']) == null
-                      ? Text((() { final n = ((m['profiles'] as Map?)?['display_name'] ?? '') as String; return n.isEmpty ? 'M' : n.trim().substring(0, 1).toUpperCase(); })().toUpperCase(),
+                      ? Text(_initialOf((m['profiles'] as Map?)?['display_name'] as String?, 'M').toUpperCase(),
                           style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: accent))
                       : null,
                 ),
@@ -473,4 +473,12 @@ class _CommunitySettingsScreenState extends ConsumerState<_CommunitySettingsScre
 
 extension _FirstOrNullX<T> on List<T> {
   T? get firstOrNull => isEmpty ? null : first;
+}
+
+/// Trim-safe first-letter helper — a whitespace-only name used to throw
+/// RangeError inside build (`''.substring(0, 1)` after trim), one of the
+/// "Relay keeps stopping" vectors. Every avatar initial goes through here.
+String _initialOf(Object? name, String fallback) {
+  final n = (name ?? '').toString().trim();
+  return n.isEmpty ? fallback : n.substring(0, 1).toUpperCase();
 }

@@ -1,30 +1,23 @@
-// This is a basic Flutter widget test.
+// Smoke test — build-time invariants of the client config.
 //
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
+// The previous widget test referenced `MyApp`, a class that no longer exists
+// in main.dart (the app uses a runZonedGuarded crash shell + RelayApp), so it
+// could never compile. These tests run without platform bindings and pin the
+// production-critical constants.
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:relay_client/main.dart';
+import 'package:relay_client/core/constants.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  test('RelayConfig points at the production backend + web auth surface', () {
+    expect(RelayConfig.authBaseUrl, 'https://relayid.vercel.app');
+    expect(RelayConfig.appName, 'Relay');
+    expect(RelayConfig.packageName, 'app.orubus.relay');
+    expect(RelayConfig.supabaseUrl, startsWith('https://'));
+  });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  test('supabaseRef is derived from supabaseUrl (no hardcoded ref)', () {
+    final host = Uri.parse(RelayConfig.supabaseUrl).host;
+    expect(RelayConfig.supabaseRef, host.split('.').first);
+    expect(RelayConfig.supabaseRef, isNotEmpty);
   });
 }

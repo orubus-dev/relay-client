@@ -113,16 +113,23 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final api = ref.read(apiProvider);
     _channel?.unsubscribe();
     _channel = api.subscribeMessages(widget.chatId, (row) async {
-      await ref.read(syncEngineProvider).ingestRealtimeRow(row);
+      // a bad realtime row must never tear the chat down — degrade to the
+      // local snapshot (the sync cursor reconciles on next open)
+      try {
+        await ref.read(syncEngineProvider).ingestRealtimeRow(row);
+      } catch (_) {}
       if (mounted) setState(() => _messages = ref.read(localDbProvider).listMessages(widget.chatId));
       _scrollToBottom();
     });
   }
 
+  /// With a reverse:true list, offset 0 IS the bottom (newest message) —
+  /// anchoring no longer depends on maxScrollExtent being measured, which is
+  /// what made the old scroll jump/stick mid-history.
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) {
-        _scroll.animateTo(_scroll.position.maxScrollExtent,
+        _scroll.animateTo(0,
             duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
       }
     });
@@ -487,11 +494,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   )
                 : ListView.builder(
                     controller: _scroll,
+                    // reverse anchors the list to the BOTTOM (offset 0 = newest)
+                    // — the chat opens on the newest message and stays put while
+                    // it grows, instead of drifting with late-measured extents.
+                    reverse: true,
+                    // scroll must work even with a single message on screen
+                    physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                     itemCount: _messages.length,
                     itemBuilder: (context, i) {
-                      final m = _messages[i];
-                      final showDate = i == 0 || !_sameDay(_messages[i - 1], m);
+                      // reverse index 0 = newest; map back to chronological order
+                      final j = _messages.length - 1 - i;
+                      final m = _messages[j];
+                      final showDate = j == 0 || !_sameDay(_messages[j - 1], m);
                       return Column(
                         children: [
                           if (showDate) _dateChip(m, isDark),
@@ -513,13 +528,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             Padding(
               padding: const EdgeInsets.only(bottom: 4),
               child: GestureDetector(
-                // permission hints are tappable → straight to app settings
+                // permission hints are tappable — but they follow OS ground
+                // truth: permanently-denied opens Settings, a plain "denied"
+                // re-fires the OS dialog (never sends the user to Settings
+                // while the permission is merely un-asked)
                 onTap: _micResolved && _mic != MicPermission.granted
                     ? () async {
-                        await openAppSettings();
-                        // re-resolve on return from settings
-                        final p = await ref.read(voiceRecorderProvider).resolvePermission(request: false);
-                        if (mounted) setState(() { _mic = p; if (p == MicPermission.granted) _hint = null; });
+                        if (_mic == MicPermission.blocked) {
+                          await openAppSettings();
+                          // re-resolve on return from settings
+                          final p = await ref.read(voiceRecorderProvider).resolvePermission(request: false);
+                          if (mounted) setState(() { _mic = p; if (p == MicPermission.granted) _hint = null; });
+                        } else {
+                          final p = await ref.read(voiceRecorderProvider).resolvePermission(request: true);
+                          if (mounted) setState(() { _mic = p; if (p == MicPermission.granted) _hint = null; });
+                        }
                       }
                     : null,
                 child: Text(_hint!, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: accent)),

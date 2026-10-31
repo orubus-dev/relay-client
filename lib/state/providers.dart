@@ -70,6 +70,10 @@ class AuthController extends StateNotifier<AuthState> {
         await ref.read(syncEngineProvider).bootstrap();
       } catch (_) {}
       state = AuthState(ready: true, signedIn: true, profile: profile);
+      // OFFLINE-FIRST: the restore path may have entered with cached tokens
+      // (airplane mode). Heal the session in the background — rotate tokens
+      // and persist them; failures are swallowed inside the repository.
+      ref.read(authRepositoryProvider).refreshInBackground();
     } else {
       state = AuthState(ready: true, signedIn: false);
     }

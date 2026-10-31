@@ -93,7 +93,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> with SingleTicker
           _feed[index] = {
             ...post,
             'liked_by_me': res['liked'] ?? true,
-            'like_count': res['like_count'] ?? ((post['like_count'] ?? 0) as int) + 1,
+            'like_count': res['like_count'] ?? (int.tryParse('${post['like_count'] ?? 0}') ?? 0) + 1,
           };
         });
       }
@@ -277,7 +277,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> with SingleTicker
                   label: (s['display_name'] ?? s['username'] ?? 'User').toString(),
                   avatar: s['avatar_url'] as String?,
                   accent: accent,
-                  seen: (s['view_count'] ?? 0) > 0 && s['profile_id'] != me,
+                  seen: (int.tryParse('${s['view_count'] ?? 0}') ?? 0) > 0 && s['profile_id'] != me,
                   onTap: () => _openViewer(_stories.indexOf(s)),
                 ),
             ],

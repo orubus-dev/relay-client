@@ -1,7 +1,7 @@
 name: relay_client
 description: Relay — Signal-grade E2EE messenger. Unified Flutter client for Android + Windows.
 publish_to: "none"
-version: 1.0.8+1080
+version: 1.0.9+1090
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
@@ -50,6 +50,7 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^4.0.0
   flutter_launcher_icons: ^0.13.1
+  flutter_native_splash: ^2.4.4
 
 flutter_launcher_icons:
   android: true

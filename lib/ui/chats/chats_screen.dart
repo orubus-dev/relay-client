@@ -87,19 +87,23 @@ class _ChatsScreenState extends ConsumerState<ChatsScreen> {
                   final c = chats[i];
                   final unread = (c['unread_count'] as int? ?? 0);
                   final isGroup = c['type'] == 'group' || c['type'] == 'channel';
+                  // trim BEFORE substring — a whitespace-only name used to throw
+                  // RangeError inside build (a "Relay keeps stopping" vector)
+                  final chatName = ((c['name'] ?? 'Conversation') as String).trim();
+                  final initial = chatName.isEmpty ? '?' : chatName.substring(0, 1).toUpperCase();
                   return ListTile(
                     leading: CircleAvatar(
                       backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.15),
                       backgroundImage: c['avatar_url'] != null ? NetworkImage(c['avatar_url'] as String) : null,
                       child: c['avatar_url'] == null
                           ? Text(
-                              ((c['name'] ?? '') as String).isEmpty ? '?' : (c['name'] as String).trim().substring(0, 1).toUpperCase().toUpperCase(),
+                              initial,
                               style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w800),
                             )
                           : null,
                     ),
                     title: Text(
-                      (c['name'] ?? 'Conversation') as String,
+                      chatName.isEmpty ? 'Conversation' : chatName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
@@ -122,7 +126,7 @@ class _ChatsScreenState extends ConsumerState<ChatsScreen> {
                         : null,
                     onTap: () => widget.onOpenChat(
                       c['id'] as String,
-                      (c['name'] ?? 'Conversation') as String,
+                      chatName.isEmpty ? 'Conversation' : chatName,
                       (c['type'] ?? 'direct') as String,
                     ),
                   );

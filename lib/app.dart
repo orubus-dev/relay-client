@@ -60,7 +60,11 @@ class _SplashState extends ConsumerState<_Splash> {
   @override
   Widget build(BuildContext context) {
     final accent = ref.watch(themeControllerProvider).accent;
+    // Background pinned to the native splash color (#0B1220 — see
+    // flutter_native_splash.yaml) so the launch screen → first Flutter frame
+    // hand-off is seamless: same brand dark, no flash, in EITHER theme mode.
     return Scaffold(
+      backgroundColor: const Color(0xFF0B1220),
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,

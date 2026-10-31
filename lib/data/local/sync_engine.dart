@@ -122,13 +122,16 @@ class SyncEngine {
     final fresh = <Map<String, Object?>>[];
     String? newestAt = cursor.lastSyncedAt;
     for (final r in rows) {
-      final createdAt = (r['created_at'] ?? '') as String;
+      // server JSON is parsed defensively — a single malformed row (null or
+      // non-String column) must never throw out of the sync loop and kill
+      // the chat; toString() never throws on a non-null dynamic
+      final createdAt = r['created_at']?.toString() ?? '';
       if (!fullHistory && cursor.lastSyncedAt != null && createdAt.compareTo(cursor.lastSyncedAt!) <= 0) {
         continue; // already stored — only NEW messages cross the wire
       }
-      final senderId = (r['sender_id'] ?? '') as String;
-      final type = (r['message_type'] ?? 'text') as String;
-      final rawContent = (r['content'] ?? '') as String;
+      final senderId = r['sender_id']?.toString() ?? '';
+      final type = r['message_type']?.toString() ?? 'text';
+      final rawContent = r['content']?.toString() ?? '';
       String content = rawContent;
       String? mediaUrl = r['media_url'] as String?;
       String? mediaKey;

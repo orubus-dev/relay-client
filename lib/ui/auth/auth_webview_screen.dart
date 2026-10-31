@@ -97,9 +97,10 @@ class _AuthWebViewScreenState extends State<AuthWebViewScreen> {
         },
         onLoadStop: (controller, url) async {
           await controller.evaluateJavascript(source: widget.auth.bridgeScript);
-          // double-check directly (bridge interval may lag on slow loads)
+          // double-check directly (bridge interval may lag on slow loads);
+          // the storage key is derived from the configured backend ref
           final raw = await controller.evaluateJavascript(
-            source: "localStorage.getItem('sb-gobwknacvpgysmgpvzqt-auth-token')",
+            source: "localStorage.getItem('sb-${RelayConfig.supabaseRef}-auth-token')",
           );
           if (raw is String && raw.isNotEmpty) {
             final decoded = raw.startsWith('"') ? jsonDecode(raw) as String : raw;

@@ -68,3 +68,38 @@ flutter run                 # android
 flutter config --enable-windows-desktop
 flutter run -d windows      # windows
 ```
+
+## Changelog
+
+### v1.0.9+1090
+- **Brand splash** — native launch screen (flutter_native_splash) now shows the
+  Relay signal mark centered on `#0B1220`; the first Flutter frame uses the
+  same background so there is no flash. Android 12+ uses the adaptive-icon
+  layers on the same brand color.
+- **Crash hardening** — proguard-rules.pro keeps for every reflection-heavy
+  plugin (inappwebview, record, just_audio, permission_handler),
+  `proguardFiles` wired into the release buildType, minSdk raised to 24,
+  defensive parsing of server JSON in the sync engine, trim-safe avatar
+  initials (a whitespace-only name could throw inside build), realtime
+  message ingestion wrapped so a bad row can't kill the chat.
+- **Manifest permissions** — RECORD_AUDIO, CAMERA, media reader grants,
+  POST_NOTIFICATIONS, VIBRATE, MODIFY_AUDIO_SETTINGS, BLUETOOTH_CONNECT,
+  WAKE_LOCK (+ optional camera `<uses-feature>`) inserted by the CI patch
+  script; fixes the mic-permission false positive and enables the in-app
+  camera.
+- **Mic ground truth** — granted/limited both count as usable; a tappable
+  hint re-fires the OS dialog when merely un-asked and opens app settings
+  only when the permission was permanently denied.
+- **Google sign-up in-app** — the entire flow (auth page → Google consent →
+  session capture) navigates inside the app's own full-screen WebView; the
+  localStorage bridge key is now derived from the configured Supabase ref.
+- **SQLite cache verified end-to-end** — chats render instantly from the
+  device DB; only NEW messages cross the wire (cursor-based sync), history
+  stays readable in airplane mode.
+- **Offline keeps you signed in** — a cold start without network re-enters
+  with the cached session and refreshes tokens in the background; sign-out
+  happens only on an explicit auth rejection (invalid refresh token).
+- **Chat scroll rebuilt** — the message list is bottom-anchored
+  (`reverse: true`) with always-scrollable physics; no more stuck/jumpy
+  scrolling in conversations.
+

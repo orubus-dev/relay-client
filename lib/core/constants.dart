@@ -11,6 +11,11 @@ class RelayConfig {
   /// Google all handled there — zero native OAuth configuration needed).
   static const String authBaseUrl = 'https://relayid.vercel.app';
 
+  /// Project ref parsed from [supabaseUrl] — the WebView session bridge keys
+  /// its localStorage lookups on it (sb-<ref>-auth-token). Never hardcode the
+  /// ref again; a backend change updates it in exactly one place.
+  static String get supabaseRef => Uri.parse(supabaseUrl).host.split('.').first;
+
   static const String packageName = 'app.orubus.relay';
   static const String appName = 'Relay';
 }

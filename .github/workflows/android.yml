@@ -35,6 +35,11 @@ jobs:
       - name: Generate launcher icons (adaptive + monochrome + windows)
         run: dart run flutter_launcher_icons
 
+      # launch screen: Relay signal mark on the brand dark color (config in
+      # flutter_native_splash.yaml) — regenerated every build alongside icons
+      - name: Generate native splash
+        run: dart run flutter_native_splash:create
+
       - name: Decode keystore
         id: keystore
         env:

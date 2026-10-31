@@ -70,7 +70,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 backgroundColor: theme.accent.withOpacity(0.15),
                 backgroundImage: profile['avatar_url'] != null ? NetworkImage(profile['avatar_url'] as String) : null,
                 child: profile['avatar_url'] == null
-                    ? Text(((profile['display_name'] ?? '') as String).isEmpty ? 'U' : (profile['display_name'] as String).trim().substring(0, 1).toUpperCase().toUpperCase(),
+                    ? Text(_initialOf(profile['display_name'] as String?, 'U'),
                         style: TextStyle(color: theme.accent, fontWeight: FontWeight.w800, fontSize: 20))
                     : null,
               ),
@@ -172,4 +172,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       ),
     );
   }
+}
+
+/// Trim-safe first-letter helper (see communities_screen.dart).
+String _initialOf(Object? name, String fallback) {
+  final n = (name ?? '').toString().trim();
+  return n.isEmpty ? fallback : n.substring(0, 1).toUpperCase();
 }

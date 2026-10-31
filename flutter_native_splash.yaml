@@ -1,0 +1,18 @@
+# Native launch screen: the Relay signal mark centered on the brand dark
+# color — matches the first Flutter frame (_Splash in lib/app.dart, same
+# background) so the hand-off is seamless with no white/black flash.
+flutter_native_splash:
+  android: true
+  ios: false
+  web: false
+
+  color: "#0B1220"
+  image: assets/icon/app_icon_foreground.png
+
+  fullscreen: false
+
+  android_12:
+    # Android 12+ splash uses the adaptive-icon layers: the foreground image
+    # over a solid brand background circle.
+    image: assets/icon/app_icon_foreground.png
+    icon_background_color: "#0B1220"

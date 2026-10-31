@@ -27,7 +27,10 @@ class VoiceRecorder {
   Future<MicPermission> resolvePermission({bool request = true}) async {
     try {
       final status = await Permission.microphone.status;
-      if (status.isGranted) return lastKnown = MicPermission.granted;
+      // granted OR limited = the OS says the mic is usable — never contradict
+      // the OS with a "permission required" hint (limited is the iOS partial
+      // grant; harmless to accept, and it keeps the two platforms consistent)
+      if (status.isGranted || status.isLimited) return lastKnown = MicPermission.granted;
       if (status.isPermanentlyDenied || status.isRestricted) {
         return lastKnown = MicPermission.blocked;
       }
@@ -35,7 +38,7 @@ class VoiceRecorder {
       // request() returns instantly (no dialog) when the OS has already
       // granted the permission — so an enabled mic can never read as denied.
       final after = await Permission.microphone.request();
-      if (after.isGranted) return lastKnown = MicPermission.granted;
+      if (after.isGranted || after.isLimited) return lastKnown = MicPermission.granted;
       if (after.isPermanentlyDenied || after.isRestricted) {
         return lastKnown = MicPermission.blocked;
       }
