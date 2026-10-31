@@ -42,6 +42,74 @@ class SyncEngine {
     }
   }
 
+  /// Persist the SENDER's own plaintext right after a successful send (the
+  /// RPC row carries the real id/created_at). The wire only ever carries the
+  /// peer-sealed envelope — there is no self entry in the fanout — so without
+  /// this local echo your own messages could never come back readable.
+  Future<void> persistOwnMessage(String conversationId, String plaintextPayload, String type, Map<String, dynamic>? rpcRow) async {
+    final me = api.myProfileId;
+    if (me == null) return;
+    String content;
+    String? mediaUrl;
+    String? mediaKey;
+    String? mime;
+    String? fileName;
+    String? replyToId;
+    String? replyToName;
+    String? replyToContent;
+    int? durationSeconds;
+    try {
+      final payload = jsonDecode(plaintextPayload) as Map<String, dynamic>;
+      final kind = payload['k'];
+      if (kind == 't' || kind == 's') {
+        content = (payload['t'] ?? '') as String;
+      } else if (kind == 'm') {
+        content = type == 'image' ? 'Photo' : type == 'voice_note' ? 'Voice note' : 'Attachment';
+        mediaUrl = (payload['u']) as String?;
+        mediaKey = payload['key'] as String?;
+        mime = payload['mime'] as String?;
+        fileName = (payload['name']) as String?;
+        final dur = payload['dur'];
+        if (dur is int) durationSeconds = dur;
+        if (dur is String) durationSeconds = int.tryParse(dur);
+      } else if (kind == 'r') {
+        return; // reset control message — never stored
+      } else {
+        content = '';
+      }
+      replyToId = payload['r'] as String?;
+      replyToName = payload['rn'] as String?;
+      replyToContent = payload['rt'] as String?;
+    } catch (_) {
+      content = plaintextPayload;
+    }
+    final id = (rpcRow?['id'] ?? '') as String;
+    if (id.isEmpty) return; // no row — nothing to echo against
+    db.insertMessages([
+      {
+        'id': id,
+        'chat_id': conversationId,
+        'sender_id': me,
+        'sender_name': rpcRow?['sender_name'],
+        'sender_avatar': rpcRow?['sender_avatar'],
+        'type': (rpcRow?['message_type'] ?? type) as String,
+        'content': content,
+        'media_url': mediaUrl ?? rpcRow?['media_url'] as String?,
+        'media_key': mediaKey,
+        'mime_type': mime,
+        'file_name': fileName ?? rpcRow?['file_name'] as String?,
+        'duration_seconds': durationSeconds,
+        'reply_to_id': replyToId ?? rpcRow?['reply_to_message_id'] as String?,
+        'reply_to_name': replyToName,
+        'reply_to_content': replyToContent,
+        'delivery_state': 'sent',
+        'is_edited': false,
+        'is_deleted': false,
+        'created_at': (rpcRow?['created_at'] ?? DateTime.now().toUtc().toIso8601String()) as String,
+      }
+    ]);
+  }
+
   /// Fetch only NEW messages for a conversation into the local db.
   /// Decrypts ratchet envelopes before persisting — plaintext at rest stays
   /// device-local; the network never carried it.
@@ -69,8 +137,26 @@ class SyncEngine {
       String? replyToId;
       String? replyToName;
       String? replyToContent;
+      int? durationSeconds;
 
-      if (rawContent.isNotEmpty && (api.e2ee.isEnvelope(rawContent) || api.e2ee.isFanout(rawContent))) {
+      // Own rows carry envelopes sealed to the PEER — there is no self entry
+      // in the fanout, so they can only come back readable via the local echo
+      // written by persistOwnMessage (INSERT OR IGNORE keeps it). Never feed
+      // own rows through peer-session decrypt, and never fire a self-addressed
+      // session reset because of them.
+      if (senderId == me) {
+        content = rawContent.isEmpty
+            ? (type == 'image'
+                ? 'Photo'
+                : type == 'voice_note'
+                    ? 'Voice note'
+                    : 'Sent from another device')
+            : 'Sent from another device';
+        if (rawContent.isNotEmpty) {
+          // locally-echoed row already exists — INSERT OR IGNORE keeps it
+          continue;
+        }
+      } else if (rawContent.isNotEmpty && (api.e2ee.isEnvelope(rawContent) || api.e2ee.isFanout(rawContent))) {
         try {
           final payloadJson = await api.e2ee.decryptAny(me, conversationId, senderId, rawContent);
           if (payloadJson == null) {
@@ -90,6 +176,9 @@ class SyncEngine {
               mediaKey = payload['key'] as String?;
               mime = payload['mime'] as String?;
               fileName = (payload['name'] ?? fileName) as String?;
+              final dur = payload['dur'];
+              if (dur is int) durationSeconds = dur;
+              if (dur is String) durationSeconds = int.tryParse(dur);
             }
             // reply metadata rides inside the encrypted payload (r=id, rn=name, rt=snippet)
             replyToId = payload['r'] as String?;
@@ -132,7 +221,7 @@ class SyncEngine {
         'media_key': mediaKey,
         'mime_type': mime,
         'file_name': fileName,
-        'duration_seconds': null,
+        'duration_seconds': durationSeconds,
         'reply_to_id': replyToId ?? r['reply_to_message_id'],
         'reply_to_name': replyToName,
         'reply_to_content': replyToContent,

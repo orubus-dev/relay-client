@@ -212,7 +212,7 @@ class _CommunitiesScreenState extends ConsumerState<CommunitiesScreen> {
                       leading: CircleAvatar(
                         backgroundImage: c['avatar_url'] != null ? NetworkImage(c['avatar_url'] as String) : null,
                         child: c['avatar_url'] == null
-                            ? Text((c['name'] ?? 'C').toString().substring(0, 1).toUpperCase())
+                            ? Text(((c['name'] ?? '') as String).isEmpty ? 'C' : (c['name'] as String).trim().substring(0, 1).toUpperCase().toUpperCase())
                             : null,
                       ),
                       title: Text((c['name'] ?? '') as String, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
@@ -401,7 +401,7 @@ class _CommunitySettingsScreenState extends ConsumerState<_CommunitySettingsScre
                 backgroundImage: widget.community['avatar_url'] != null ? NetworkImage(widget.community['avatar_url'] as String) : null,
                 backgroundColor: accent.withOpacity(0.16),
                 child: widget.community['avatar_url'] == null
-                    ? Text((widget.community['name'] ?? 'C').toString().substring(0, 1).toUpperCase(),
+                    ? Text(((widget.community['name'] ?? '') as String).isEmpty ? 'C' : (widget.community['name'] as String).trim().substring(0, 1).toUpperCase().toUpperCase(),
                         style: TextStyle(color: accent, fontWeight: FontWeight.w800, fontSize: 20))
                     : null,
               ),
@@ -443,7 +443,7 @@ class _CommunitySettingsScreenState extends ConsumerState<_CommunitySettingsScre
                       : null,
                   backgroundColor: accent.withOpacity(0.12),
                   child: ((m['profiles'] as Map?)?['avatar_url']) == null
-                      ? Text((((m['profiles'] as Map?)?['display_name']) ?? 'M').toString().substring(0, 1).toUpperCase(),
+                      ? Text((() { final n = ((m['profiles'] as Map?)?['display_name'] ?? '') as String; return n.isEmpty ? 'M' : n.trim().substring(0, 1).toUpperCase(); })().toUpperCase(),
                           style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: accent))
                       : null,
                 ),

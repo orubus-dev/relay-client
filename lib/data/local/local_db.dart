@@ -12,9 +12,22 @@ class LocalDb {
   Database? _db;
 
   Future<void> init() async {
-    final dir = await getApplicationDocumentsDirectory();
-    final dbPath = p.join(dir.path, 'relay.db');
-    _db = sqlite3.open(dbPath);
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      _openAt(dir.path);
+    } catch (_) {
+      // documents dir unavailable (rare Android cold starts / sandboxed CI):
+      // fall back to the temp dir before giving up — the app is useless
+      // without the local database, but a temp db beats a guaranteed crash.
+      final tmp = await getTemporaryDirectory();
+      _openAt(p.join(tmp.path, 'relay_fallback'));
+    }
+  }
+
+  void _openAt(String dirPath) {
+    final dir = Directory(dirPath);
+    if (!dir.existsSync()) dir.createSync(recursive: true);
+    _db = sqlite3.open(p.join(dirPath, 'relay.db'));
     _migrate();
   }
 
@@ -67,7 +80,13 @@ class LocalDb {
     ''');
   }
 
-  Database get _d => _db!;
+  Database get _d {
+    final db = _db;
+    if (db == null) {
+      throw StateError('LocalDb.init() has not completed — chat storage unavailable');
+    }
+    return db;
+  }
 
   // ---------------- chats ----------------
 

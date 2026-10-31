@@ -58,10 +58,17 @@ class AuthController extends StateNotifier<AuthState> {
       if (store is HiveCryptoStore) await store.init();
     } catch (_) {}
     final auth = ref.read(authRepositoryProvider);
-    final profile = await auth.restore();
+    Map<String, dynamic>? profile;
+    try {
+      profile = await auth.restore();
+    } catch (_) {
+      profile = null;
+    }
     if (profile != null) {
-      final sync = ref.read(syncEngineProvider);
-      await sync.bootstrap();
+      // never let a cold-start network failure pin the app on the splash
+      try {
+        await ref.read(syncEngineProvider).bootstrap();
+      } catch (_) {}
       state = AuthState(ready: true, signedIn: true, profile: profile);
     } else {
       state = AuthState(ready: true, signedIn: false);
@@ -69,8 +76,9 @@ class AuthController extends StateNotifier<AuthState> {
   }
 
   Future<void> onWebViewSession(Map<String, dynamic> profile) async {
-    final sync = ref.read(syncEngineProvider);
-    await sync.bootstrap();
+    try {
+      await ref.read(syncEngineProvider).bootstrap();
+    } catch (_) {}
     state = AuthState(ready: true, signedIn: true, profile: profile);
   }
 

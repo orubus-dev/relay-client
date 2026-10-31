@@ -574,7 +574,12 @@ Future<String> ratchetDecrypt(RatchetState state, String conversationId, Envelop
   if (viaSkipped != null) return viaSkipped;
 
   if (env.dh != state.dhRemote) {
-    _storeSkipped(state, state.dhRemote!, env.pn);
+    // A pure responder's first prekey message arrives before any receiving
+    // chain exists (dhRemote == null): there are no skipped keys to store —
+    // the null-assert here used to TypeError every first inbound DM.
+    if (state.dhRemote != null && state.ckReceiving != null) {
+      _storeSkipped(state, state.dhRemote!, env.pn);
+    }
     await _dhRatchetStep(state, env.dh);
   }
   if (env.n < state.nReceiving) throw StateError('Message replay/underflow');

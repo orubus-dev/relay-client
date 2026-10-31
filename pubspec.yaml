@@ -1,7 +1,7 @@
 name: relay_client
 description: Relay — Signal-grade E2EE messenger. Unified Flutter client for Android + Windows.
 publish_to: "none"
-version: 0.5.4+540
+version: 1.0.6+1060
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
@@ -32,8 +32,11 @@ dependencies:
   # media
   record: ^7.1.2
   just_audio: ^0.9.39
+  just_audio_windows: ^0.2.2  # voice/story playback on Windows (else MissingPluginException)
   image_picker: ^1.1.2
   http: ^1.2.1
+  # runtime permissions (OS ground truth for the mic)
+  permission_handler: ^11.3.1
   # ui
   google_fonts: ^6.2.1
   flutter_svg: ^2.0.10+1

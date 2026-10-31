@@ -79,7 +79,8 @@ class _VoiceRoomScreenState extends ConsumerState<VoiceRoomScreen> {
 
   String _name(Map<String, dynamic> occ) {
     final p = occ['profiles'] as Map<String, dynamic>?;
-    return (p?['display_name'] ?? p?['username'] ?? 'Member').toString();
+    final n = (p?['display_name'] ?? p?['username'] ?? '').toString().trim();
+    return n.isEmpty ? 'Member' : n;
   }
 
   @override

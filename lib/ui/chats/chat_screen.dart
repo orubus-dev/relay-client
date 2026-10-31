@@ -6,9 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:realtime_client/realtime_client.dart';
-import 'package:record/record.dart';
-
+import '../../services/voice_recorder.dart';
 import '../../state/providers.dart';
 
 /// Chat screen — rebuilt WhatsApp-grade:
@@ -64,6 +64,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   String? _hint;
   String? _error;
 
+  // mic permission — resolved up front so the first hold-to-record never
+  // fires a system dialog mid-gesture, and the hint is always accurate.
+  MicPermission _mic = MicPermission.denied;
+  bool _micResolved = false;
+
   RealtimeChannel? _channel;
 
   @override
@@ -71,6 +76,26 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     super.initState();
     _loadLocalThenSync();
     _subscribe();
+    _warmMicPermission();
+  }
+
+  Future<void> _warmMicPermission() async {
+    try {
+      final recorder = ref.read(voiceRecorderProvider);
+      final p = await recorder.resolvePermission(request: false);
+      if (!mounted) return;
+      setState(() {
+        _mic = p;
+        _micResolved = true;
+      });
+      // Denied (not blocked) on entry: ask once now, out of the record gesture.
+      if (p == MicPermission.denied) {
+        final after = await recorder.resolvePermission(request: true);
+        if (mounted) setState(() => _mic = after);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _micResolved = true);
+    }
   }
 
   Future<void> _loadLocalThenSync() async {
@@ -111,6 +136,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _typingDebounce?.cancel();
     _recTicker?.cancel();
     _player?.dispose();
+    // never strand the app-lifetime recorder (mic stays hot otherwise)
+    try {
+      ref.read(voiceRecorderProvider).isRecording.then((hot) {
+        if (hot) ref.read(voiceRecorderProvider).stop();
+      }).catchError((_) {});
+    } catch (_) {}
     super.dispose();
   }
 
@@ -130,12 +161,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       payload['rt'] = (reply['content'] ?? '') as String;
     }
     try {
-      await ref.read(apiProvider).sendMessageRaw(
+      final api = ref.read(apiProvider);
+      final sync = ref.read(syncEngineProvider);
+      final row = await api.sendMessageRaw(
             widget.chatId,
             jsonEncode(payload),
             'text',
           );
-      await ref.read(syncEngineProvider).syncMessages(widget.chatId);
+      // own plaintext lives here (fanout has no self entry) — echo it into the
+      // local db BEFORE sync so the row comes back readable
+      await sync.persistOwnMessage(widget.chatId, jsonEncode(payload), 'text', row);
+      await sync.syncMessages(widget.chatId);
       setState(() => _messages = ref.read(localDbProvider).listMessages(widget.chatId));
       _scrollToBottom();
     } catch (e) {
@@ -150,17 +186,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     });
     try {
       final api = ref.read(apiProvider);
+      final sync = ref.read(syncEngineProvider);
       final uploaded = await api.uploadEncryptedFile(filePath, mime: 'audio/mp4');
+      final dur = _recDuration.inSeconds;
       final payload = jsonEncode({
         'k': 'm',
         'u': uploaded['url'],
         'key': uploaded['mediaKey'],
         'mime': 'audio/mp4',
         'name': 'Voice note',
-        'dur': _recDuration.inSeconds,
+        'dur': dur,
       });
-      await api.sendMessageRaw(widget.chatId, payload, 'voice_note');
-      await ref.read(syncEngineProvider).syncMessages(widget.chatId);
+      final row = await api.sendMessageRaw(widget.chatId, payload, 'voice_note');
+      // own voice notes decrypt through the local echo, not the peer envelope
+      await sync.persistOwnMessage(widget.chatId, payload, 'voice_note', row);
+      await sync.syncMessages(widget.chatId);
       setState(() => _messages = ref.read(localDbProvider).listMessages(widget.chatId));
       _scrollToBottom();
     } catch (e) {
@@ -227,14 +267,32 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   Future<void> _onMicDown(PointerDownEvent e) async {
     final recorder = ref.read(voiceRecorderProvider);
-    if (!await recorder.hasPermission()) {
-      setState(() => _hint = 'Microphone permission required');
+    // Ground-truth OS check. When the mic is genuinely off we say exactly
+    // that; when it is enabled we NEVER show a permission hint here.
+    final mic = await recorder.resolvePermission();
+    if (!mounted) return;
+    if (mic != MicPermission.granted) {
+      setState(() {
+        _mic = mic;
+        _micResolved = true;
+        _hint = mic == MicPermission.blocked
+            ? 'Microphone is off for Relay — tap to open Settings'
+            : 'Microphone permission required — tap to allow';
+      });
       return;
     }
+    if (_recording) return; // pointer double-fire guard
+    setState(() => _hint = null);
     _pressStart = DateTime.now();
     _pressStartDy = e.position.dy;
     _pressStartDx = e.position.dx;
     await recorder.start();
+    if (!mounted || _pressStart == null) {
+      // release already happened while start() was in flight — don't strand
+      // a running recorder
+      try { await recorder.stop(); } catch (_) {}
+      return;
+    }
     _recTicker?.cancel();
     _recDuration = Duration.zero;
     _wave = List.filled(22, 0.3);
@@ -278,9 +336,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Future<void> _cancelRecording() async {
     final recorder = ref.read(voiceRecorderProvider);
     _recTicker?.cancel();
+    _pressStart = null;
     try {
       await recorder.stop();
     } catch (_) {}
+    if (!mounted) return;
     setState(() {
       _recording = false;
       _locked = false;
@@ -290,7 +350,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Future<void> _finishRecording() async {
     final recorder = ref.read(voiceRecorderProvider);
     _recTicker?.cancel();
+    _pressStart = null;
     final path = await recorder.stop();
+    if (!mounted) return;
     setState(() {
       _recording = false;
       _locked = false;
@@ -386,7 +448,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           if (_hint != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 4),
-              child: Text(_hint!, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: accent)),
+              child: GestureDetector(
+                // permission hints are tappable → straight to app settings
+                onTap: _micResolved && _mic != MicPermission.granted
+                    ? () async {
+                        await openAppSettings();
+                        // re-resolve on return from settings
+                        final p = await ref.read(voiceRecorderProvider).resolvePermission(request: false);
+                        if (mounted) setState(() { _mic = p; if (p == MicPermission.granted) _hint = null; });
+                      }
+                    : null,
+                child: Text(_hint!, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: accent)),
+              ),
             ),
           _composerBar(accent, isDark),
         ],

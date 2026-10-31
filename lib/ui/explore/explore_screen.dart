@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-import 'package:record/record.dart';
+import '../../services/voice_recorder.dart';
 
 import '../../state/providers.dart';
 
@@ -196,7 +196,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> with SingleTicker
   }
 
   Widget _threadCard(Map<String, dynamic> post, Color accent) {
-    final author = (post['author_name'] ?? post['authorName'] ?? post['display_name'] ?? 'User').toString();
+    final author = ((post['author_name'] ?? post['authorName'] ?? post['display_name'] ?? '') as String).trim().isEmpty ? 'User' : (post['author_name'] ?? post['authorName'] ?? post['display_name']).toString().trim();
     final avatar = post['author_avatar'] ?? post['authorAvatar'];
     final content = (post['content'] ?? '').toString();
     final liked = post['liked_by_me'] == true;
@@ -217,7 +217,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> with SingleTicker
                   radius: 15,
                   backgroundImage: avatar != null ? NetworkImage(avatar as String) : null,
                   backgroundColor: accent.withOpacity(0.15),
-                  child: avatar == null ? Text(author[0].toUpperCase(), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: accent)) : null,
+                  child: avatar == null ? Text(author.isEmpty ? 'U' : author[0].toUpperCase(), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: accent)) : null,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -367,7 +367,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> with SingleTicker
                         backgroundImage: avatar != null ? NetworkImage(avatar) : null,
                         backgroundColor: accent.withOpacity(0.15),
                         child: avatar == null
-                            ? Text(label[0].toUpperCase(), style: TextStyle(color: accent, fontWeight: FontWeight.w800))
+                            ? Text(label.isEmpty ? '?' : label[0].toUpperCase(), style: TextStyle(color: accent, fontWeight: FontWeight.w800))
                             : null,
                       ),
               ),
@@ -440,7 +440,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> with SingleTicker
                             backgroundImage: p['avatar_url'] != null ? NetworkImage(p['avatar_url'] as String) : null,
                             backgroundColor: accent.withOpacity(0.15),
                             child: p['avatar_url'] == null
-                                ? Text(((p['display_name'] ?? p['username'] ?? 'U') as String)[0].toUpperCase(),
+                                ? Text(((p['display_name'] ?? p['username'] ?? 'U') as String).isEmpty ? 'U' : ((p['display_name'] ?? p['username'] ?? 'U') as String)[0].toUpperCase(),
                                     style: TextStyle(color: accent, fontWeight: FontWeight.w800))
                                 : null,
                           ),
@@ -649,7 +649,7 @@ class _StoryViewerState extends ConsumerState<_StoryViewer> {
                           backgroundImage: s['avatar_url'] != null ? NetworkImage(s['avatar_url'] as String) : null,
                           backgroundColor: Colors.white24,
                           child: s['avatar_url'] == null
-                              ? Text(((s['display_name'] ?? 'U') as String)[0].toUpperCase(),
+                              ? Text(((s['display_name'] ?? 'U') as String).isEmpty ? 'U' : ((s['display_name'] ?? 'U') as String)[0].toUpperCase(),
                                   style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w800))
                               : null,
                         ),
@@ -812,6 +812,7 @@ class _StoryComposerState extends ConsumerState<_StoryComposer> {
   Timer? _ticker;
   DateTime? _pressStart;
   bool _posting = false;
+  String? _voiceError;
 
   static const _gradients = [
     [0xFF667EEA, 0xFF764BA2],
@@ -826,6 +827,12 @@ class _StoryComposerState extends ConsumerState<_StoryComposer> {
   void dispose() {
     _text.dispose();
     _ticker?.cancel();
+    // never strand the app-lifetime recorder (mic stays hot otherwise)
+    try {
+      ref.read(voiceRecorderProvider).isRecording.then((hot) {
+        if (hot) ref.read(voiceRecorderProvider).stop();
+      }).catchError((_) {});
+    } catch (_) {}
     super.dispose();
   }
 
@@ -847,8 +854,21 @@ class _StoryComposerState extends ConsumerState<_StoryComposer> {
 
   Future<void> _startVoice() async {
     final recorder = ref.read(voiceRecorderProvider);
-    if (!await recorder.hasPermission()) return;
-    await recorder.start();
+    if (await recorder.resolvePermission() != MicPermission.granted) {
+      if (mounted) setState(() => _voiceError = 'Microphone permission required');
+      return;
+    }
+    try {
+      if (await recorder.isRecording) await recorder.stop(); // stale state guard
+      await recorder.start();
+    } catch (_) {
+      if (mounted) setState(() => _voiceError = 'Could not start recording');
+      return;
+    }
+    if (!mounted) {
+      try { await recorder.stop(); } catch (_) {}
+      return;
+    }
     _pressStart = DateTime.now();
     _ticker?.cancel();
     _ticker = Timer.periodic(const Duration(milliseconds: 200), (_) {
@@ -862,6 +882,7 @@ class _StoryComposerState extends ConsumerState<_StoryComposer> {
     final recorder = ref.read(voiceRecorderProvider);
     _ticker?.cancel();
     final path = await recorder.stop();
+    if (!mounted) return;
     setState(() {
       _recording = false;
       _voicePath = discard ? null : path;
@@ -930,6 +951,14 @@ class _StoryComposerState extends ConsumerState<_StoryComposer> {
       ),
       body: Column(
         children: [
+          if (_voiceError != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(_voiceError!, style: TextStyle(color: Colors.redAccent, fontSize: 11, fontWeight: FontWeight.w700)),
+              ),
+            ),
           Expanded(
             child: _mode == 'text'
                 ? Container(

@@ -93,7 +93,7 @@ class _ChatsScreenState extends ConsumerState<ChatsScreen> {
                       backgroundImage: c['avatar_url'] != null ? NetworkImage(c['avatar_url'] as String) : null,
                       child: c['avatar_url'] == null
                           ? Text(
-                              (c['name'] ?? '?').toString().substring(0, 1).toUpperCase(),
+                              ((c['name'] ?? '') as String).isEmpty ? '?' : (c['name'] as String).trim().substring(0, 1).toUpperCase().toUpperCase(),
                               style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w800),
                             )
                           : null,

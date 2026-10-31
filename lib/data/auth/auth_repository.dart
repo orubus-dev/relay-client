@@ -60,9 +60,17 @@ class AuthRepository {
       final user = response.user ?? response.session?.user;
       if (user == null) return null;
       final profile = await fetchProfile(user.id);
-      if (profile != null) await _secure.write(key: _kProfile, value: jsonEncode(profile));
-      return profile;
+      if (profile != null) {
+        await _secure.write(key: _kProfile, value: jsonEncode(profile));
+        return profile;
+      }
+      // The session itself is valid — an offline/flaky profile fetch must not
+      // sign the user out. Fall back to the cached profile; the app re-fetches
+      // once the network is back.
+      final cached = await cachedProfile();
+      return cached; // may be null — then the UI shows sign-in again
     } catch (_) {
+      // recoverSession throws for a genuinely dead/expired-refresh session.
       await _secure.delete(key: _kSession);
       return null;
     }

@@ -24,6 +24,15 @@ if [ -f "$MANIFEST" ]; then
   sed -i.bak -E 's|android:label="relay_client"|android:label="Relay"|g; s|android:label="[a-z_]+"|android:label="Relay"|g' "$MANIFEST"
   rm -f "$MANIFEST.bak"
   grep -q 'android:label="Relay"' "$MANIFEST" || echo "::warning::failed to set android:label=Relay"
+
+  # Microphone: the flutter-generated template does NOT declare RECORD_AUDIO.
+  # record_android merges it via its own manifest, but belt-and-braces so the
+  # permission check NEVER false-negotiates on a manifest that lacks it.
+  if ! grep -q 'android.permission.RECORD_AUDIO' "$MANIFEST"; then
+    sed -i.bak 's|<manifest xmlns:android="http://schemas.android.com/apk/res/android">|<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n\n    <uses-permission android:name="android.permission.RECORD_AUDIO" />|' "$MANIFEST"
+    rm -f "$MANIFEST.bak"
+    grep -q 'android.permission.RECORD_AUDIO' "$MANIFEST" && echo "patched RECORD_AUDIO into manifest" || echo "::warning::failed to add RECORD_AUDIO"
+  fi
 fi
 STRINGS="android/app/src/main/res/values/strings.xml"
 if [ -f "$STRINGS" ]; then

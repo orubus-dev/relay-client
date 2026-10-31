@@ -70,7 +70,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 backgroundColor: theme.accent.withOpacity(0.15),
                 backgroundImage: profile['avatar_url'] != null ? NetworkImage(profile['avatar_url'] as String) : null,
                 child: profile['avatar_url'] == null
-                    ? Text((profile['display_name'] ?? 'U').toString().substring(0, 1).toUpperCase(),
+                    ? Text(((profile['display_name'] ?? '') as String).isEmpty ? 'U' : (profile['display_name'] as String).trim().substring(0, 1).toUpperCase().toUpperCase(),
                         style: TextStyle(color: theme.accent, fontWeight: FontWeight.w800, fontSize: 20))
                     : null,
               ),

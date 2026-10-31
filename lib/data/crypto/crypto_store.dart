@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:hive/hive.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 import 'e2ee_service.dart';
 import 'signal_protocol.dart';
@@ -14,6 +14,12 @@ class HiveCryptoStore implements CryptoStore {
   Box? _sessBox;
 
   Future<void> init() async {
+    // Without an explicit init Hive falls back to Directory.current — which on
+    // Android is read-only, so openBox threw, every identity/session op
+    // silently no-op'd, and the identity re-registered (losing ALL sessions)
+    // on every launch. initFlutter() points Hive at the app documents dir on
+    // both Android and Windows.
+    await Hive.initFlutter();
     _idBox = await Hive.openBox(_identityBox);
     _sessBox = await Hive.openBox(_sessionsBox);
   }
