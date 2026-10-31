@@ -118,7 +118,7 @@ class _AuthWebViewScreenState extends State<AuthWebViewScreen> {
       final uri = Uri.parse(url.replaceFirst('relay://', 'https://relay.invalid/'));
       final params = <String, String>{
         ...uri.queryParameters,
-        if (uri.fragment.isNotEmpty) ...Uri.queryParameters(uri.fragment),
+        if (uri.fragment.isNotEmpty) ...Uri.splitQueryString(uri.fragment),
       };
       final access = params['access_token'];
       final refresh = params['refresh_token'];
