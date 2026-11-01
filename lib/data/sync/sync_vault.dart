@@ -284,10 +284,10 @@ class SyncVault {
     }
     final sk = await ensureSpaceKey(space);
     final ephJwk = await newEcdhJwk();
-    final ephPair = await ecdhPairFromJwk(ephJwk);
+    final (ephPriv, _) = ecdhPairFromJwk(ephJwk);
     final peer = ecPubFromJwk(
         Map<String, dynamic>.from(pubList.first['pub_jwk'] as Map));
-    final channel = await channelKeyBytes(ephPair, peer);
+    final channel = await channelKeyBytes(ephPriv, peer);
     final iv = randomBytes(12);
     final box = await aesEncrypt(channel, sk, iv);
     await sb.from('sync_space_shares').upsert({
@@ -323,10 +323,10 @@ class SyncVault {
     final privJwk = await _wrappedPrivateJwk();
     if (privJwk == null)
       throw StateError('This account has no vault keypair yet.');
-    final myPair = await ecdhPairFromJwk(privJwk);
+    final (myPriv, _) = ecdhPairFromJwk(privJwk);
     final ephemeralPub = ecPubFromJwk(
         Map<String, dynamic>.from(share['ephemeral_pub_jwk'] as Map));
-    final channel = await channelKeyBytes(myPair, ephemeralPub);
+    final channel = await channelKeyBytes(myPriv, ephemeralPub);
     final sk = await aesDecrypt(
       channel,
       unb64(share['wrap_iv'] as String),

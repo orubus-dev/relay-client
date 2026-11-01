@@ -106,16 +106,6 @@ Future<Uint8List> derivePassphraseWrapKey(
 
 // ------------------------------------------------------- ECDH share chan --
 
-Uint8List _fixed32(List<int> component) {
-  if (component.length == 32) return Uint8List.fromList(component);
-  if (component.length > 32) {
-    return Uint8List.fromList(component.sublist(component.length - 32));
-  }
-  final out = Uint8List(32);
-  out.setRange(32 - component.length, 32, component);
-  return out;
-}
-
 /// JWK for a fresh P-256 key pair ({x, y, d} base64url, web-compatible).
 Map<String, dynamic> newEcdhJwk() {
   final d = _randomScalar();
