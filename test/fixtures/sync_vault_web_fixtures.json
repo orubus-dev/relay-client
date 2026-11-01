@@ -1,0 +1,47 @@
+{
+ "passphrase": "correct horse battery staple",
+ "salt_b64": "MTIzNDU2Nzg5MGFiY2RlZg==",
+ "wrap_key_raw_b64": "sIFrMNowglaLz/asqFtMX8xtGdsSJ4RG12QHVeUzqJw=",
+ "uk_b64": "UxJniiQt2nnUkMk517KHAPuPUukgPXqQZHnjw2vE/m8=",
+ "uk_iv_b64": "2SMz3Tc8BsFG5tDh",
+ "uk_box_b64": "5cl6tXVfH2oQPnHWYhA4iUiLArfyOX4mcbof9N8M5e2jOFOnq+0P6u+4fJOFIoJP",
+ "vault_pub_jwk": {
+  "key_ops": [],
+  "ext": true,
+  "kty": "EC",
+  "x": "XPmM1l5ZiW4F5mKOFzHL5vP5ZGc-DTTRbgz6alli9Tc",
+  "y": "-Qs4FBd6QJQSeg8ivmSnseJvJPbQ2CEZ32lo7ONBnOk",
+  "crv": "P-256"
+ },
+ "vault_priv_jwk": {
+  "key_ops": [
+   "deriveBits"
+  ],
+  "ext": true,
+  "kty": "EC",
+  "x": "XPmM1l5ZiW4F5mKOFzHL5vP5ZGc-DTTRbgz6alli9Tc",
+  "y": "-Qs4FBd6QJQSeg8ivmSnseJvJPbQ2CEZ32lo7ONBnOk",
+  "crv": "P-256",
+  "d": "sdmlh27pFaCdgwaRfnjVhzoQkbQyvSDQqgS3bogxTyc"
+ },
+ "eph_pub_jwk": {
+  "key_ops": [],
+  "ext": true,
+  "kty": "EC",
+  "x": "NJZDWPtpTWznXjmKtwo-uMKucYHUXvon0e0xdOje07I",
+  "y": "brcO4uMf5Kd_lcKRhwmcIFdV4c1aqGV3P8YtlnKObuw",
+  "crv": "P-256"
+ },
+ "share_iv_b64": "VVjVXBTOQdG/eYrN",
+ "sk_wrap_b64": "Xvr3GX8XYZVd2mqzf5Ntugu7QBzhakJ0cA+d8i9BxjBds71KnzN7ScF6FYTHKt8n",
+ "space_key_b64": "ZvSGjIpH+AQ+T2CAtHmw2P2ko4nVWzeKhyaK0D1mCXU=",
+ "rec_iv_b64": "9ZOeCvz3jugIzHhA",
+ "rec_box_b64": "ZdAUHuXG6GFDZT70d8vKO54B6ZUN/RMMHL0BL3hrJ+guqk14qRB/dYYFDJvduoW502HW",
+ "rk_iv_b64": "Bgb1kCf67F4GTRme",
+ "rk_box_b64": "0YBmKHPRjhnPHvJKR0pWoUft3BY8QDXA/DZoMtUC5M1MaIGjfoSqzfcG9SyWuLTp",
+ "payload": {
+  "hello": "world",
+  "n": 42,
+  "web": true
+ }
+}

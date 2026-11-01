@@ -32,7 +32,7 @@ class RelayConfig {
   static const String appName = 'Relay';
 
   /// Keep in sync with pubspec.yaml `version:` — shown in Profile → Developer.
-  static const String appVersion = '1.0.11+1101';
+  static const String appVersion = '1.0.12+1102';
 }
 
 /// E2EE wire-format constants — MUST match the web client exactly.

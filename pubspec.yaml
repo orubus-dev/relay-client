@@ -1,7 +1,7 @@
 name: relay_client
 description: Relay — Signal-grade E2EE messenger. Unified Flutter client for Android + Windows.
 publish_to: "none"
-version: 1.0.11+1101
+version: 1.0.12+1102
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
@@ -22,6 +22,7 @@ dependencies:
   path: ^1.9.0
   # crypto — mirrors the web client's X3DH + Double Ratchet wire format
   cryptography: ^2.7.0
+  pointycastle: ^3.9.1
   convert: ^3.1.1
   # auth via WebView (Continue with Google just works — no native OAuth setup)
   flutter_inappwebview: ^6.1.5
