@@ -49,16 +49,30 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
-  flutter_launcher_icons: ^0.13.1
+  # 0.14+ added Android adaptive monochrome support (`adaptive_icon_monochrome`)
+  # — 0.13.x had no monochrome support at all, so the Android 13+ themed-icon
+  # layer that the web client's adaptive icon declares was missing from builds
+  flutter_launcher_icons: ^0.14.1
   flutter_native_splash: ^2.4.4
 
 flutter_launcher_icons:
   android: true
   ios: false
   image_path: "assets/icon/app_icon.png"
-  adaptive_icon_background: "#0B1220"
+  # web client adaptive background is the #2563EB -> #1D4ED8 gradient
+  # (relay-work android/app/src/main/res/drawable/ic_launcher_background.xml)
+  # — mirrored here as a raster so the launcher icon matches the web app 1:1
+  adaptive_icon_background: "assets/icon/app_icon_background.png"
   adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
-  monochrome_icon: "assets/icon/app_icon_monochrome.png"
+  # the foreground asset already carries the web client's ~66% adaptive safe
+  # zone (mark spans 36..72 of the 108dp canvas, identical to the web vector
+  # drawable) — the tool's default 16% inset would shrink the mark vs web
+  adaptive_icon_foreground_inset: 0
+  # Android 13+ themed-icon layer, same mark as the web client's monochrome
+  # drawable. NOTE: the key is `adaptive_icon_monochrome` on flutter_launcher_icons
+  # 0.14+ (`monochrome_icon` was never a valid Android key — 0.13.1 silently
+  # ignored it, which is why generated builds had no themed-icon layer)
+  adaptive_icon_monochrome: "assets/icon/app_icon_monochrome.png"
   windows:
     generate: true
     image_path: "assets/icon/app_icon.png"

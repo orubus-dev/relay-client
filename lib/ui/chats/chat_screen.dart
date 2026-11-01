@@ -39,6 +39,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   List<Map<String, Object?>> _messages = [];
   final _composer = TextEditingController();
   final _scroll = ScrollController();
+  // true from the frame the user's finger grabs the list until the gesture
+  // (incl. ballistic settle) ends — see _scrollToBottom. Without this, a
+  // post-frame animateTo landing mid-drag replaced the drag activity and the
+  // list jumped out from under the finger (the "scroll is glitching" report).
+  bool _dragging = false;
+  // how far up (px) from the bottom auto-follow still engages when a message
+  // arrives in the background — past this the user is reading history and
+  // must never be yanked down
+  static const double _autoFollowSlack = 160;
   Timer? _typingDebounce;
 
   // reply state
@@ -125,13 +134,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   /// With a reverse:true list, offset 0 IS the bottom (newest message) —
   /// anchoring no longer depends on maxScrollExtent being measured, which is
-  /// what made the old scroll jump/stick mid-history.
-  void _scrollToBottom() {
+  /// what made the old scroll jump/stick mid-history (kept from 2e3041b).
+  ///
+  /// Auto-follow etiquette (fixes the glitchy/fighting scroll):
+  ///  · never fires while the user is mid-drag — the post-frame animateTo used
+  ///    to replace the drag activity and yank the list away from the finger;
+  ///  · never pulls a user who scrolled up into history back down when a
+  ///    background message lands — only [force] (own send) always follows.
+  void _scrollToBottom({bool force = false}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scroll.hasClients) {
-        _scroll.animateTo(0,
-            duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
-      }
+      if (!mounted || !_scroll.hasClients || _dragging) return;
+      if (!force && _scroll.offset > _autoFollowSlack) return;
+      _scroll.animateTo(0,
+          duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
     });
   }
 
@@ -180,7 +195,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       await sync.persistOwnMessage(widget.chatId, jsonEncode(payload), 'text', row);
       await sync.syncMessages(widget.chatId);
       setState(() => _messages = ref.read(localDbProvider).listMessages(widget.chatId));
-      _scrollToBottom();
+      _scrollToBottom(force: true); // own send: always follow (WhatsApp behavior)
     } catch (e) {
       setState(() => _error = 'Failed to send — try again');
     }
@@ -209,7 +224,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       await sync.persistOwnMessage(widget.chatId, payload, 'voice_note', row);
       await sync.syncMessages(widget.chatId);
       setState(() => _messages = ref.read(localDbProvider).listMessages(widget.chatId));
-      _scrollToBottom();
+      _scrollToBottom(force: true); // own send: always follow (WhatsApp behavior)
     } catch (e) {
       setState(() => _error = 'Voice send failed');
     }
@@ -492,28 +507,41 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       ],
                     ),
                   )
-                : ListView.builder(
-                    controller: _scroll,
-                    // reverse anchors the list to the BOTTOM (offset 0 = newest)
-                    // — the chat opens on the newest message and stays put while
-                    // it grows, instead of drifting with late-measured extents.
-                    reverse: true,
-                    // scroll must work even with a single message on screen
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                    itemCount: _messages.length,
-                    itemBuilder: (context, i) {
-                      // reverse index 0 = newest; map back to chronological order
-                      final j = _messages.length - 1 - i;
-                      final m = _messages[j];
-                      final showDate = j == 0 || !_sameDay(_messages[j - 1], m);
-                      return Column(
-                        children: [
-                          if (showDate) _dateChip(m, isDark),
-                          _bubbleRow(m, me, accent, isDark),
-                        ],
-                      );
+                : NotificationListener<ScrollNotification>(
+                    // A user grab pauses programmatic auto-follow until the
+                    // gesture (incl. ballistic) settles. Returning false keeps
+                    // the notification bubbling — nothing is swallowed.
+                    onNotification: (n) {
+                      if (n is ScrollStartNotification && n.dragDetails != null) {
+                        _dragging = true;
+                      } else if (n is ScrollEndNotification) {
+                        _dragging = false;
+                      }
+                      return false;
                     },
+                    child: ListView.builder(
+                      controller: _scroll,
+                      // reverse anchors the list to the BOTTOM (offset 0 = newest)
+                      // — the chat opens on the newest message and stays put while
+                      // it grows, instead of drifting with late-measured extents.
+                      reverse: true,
+                      // scroll must work even with a single message on screen
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                      itemCount: _messages.length,
+                      itemBuilder: (context, i) {
+                        // reverse index 0 = newest; map back to chronological order
+                        final j = _messages.length - 1 - i;
+                        final m = _messages[j];
+                        final showDate = j == 0 || !_sameDay(_messages[j - 1], m);
+                        return Column(
+                          children: [
+                            if (showDate) _dateChip(m, isDark),
+                            _bubbleRow(m, me, accent, isDark),
+                          ],
+                        );
+                      },
+                    ),
                   ),
           ),
           if (_error != null)

@@ -59,7 +59,6 @@ class _SplashState extends ConsumerState<_Splash> {
 
   @override
   Widget build(BuildContext context) {
-    final accent = ref.watch(themeControllerProvider).accent;
     // Background pinned to the native splash color (#0B1220 — see
     // flutter_native_splash.yaml) so the launch screen → first Flutter frame
     // hand-off is seamless: same brand dark, no flash, in EITHER theme mode.
@@ -69,15 +68,10 @@ class _SplashState extends ConsumerState<_Splash> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: accent,
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: const Icon(Icons.bolt_rounded, color: Colors.white, size: 36),
-            ),
+            // the actual brand mark (same asset as the launcher + native
+            // splash) — a placeholder bolt here flashed a DIFFERENT mark
+            // between the native launch screen and the first Flutter frame
+            Image.asset('assets/icon/app_icon.png', width: 64, height: 64),
             const SizedBox(height: 16),
             Text(
               RelayConfig.appName.toUpperCase(),
