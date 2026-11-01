@@ -37,9 +37,7 @@ jobs:
         run: flutter pub get
 
       - name: Build Windows release
-        run: flutter build windows --release \
-          --dart-define=RELAY_SUPABASE_URL=${{ secrets.RELAY_SUPABASE_URL }} \
-          --dart-define=RELAY_SUPABASE_ANON_KEY=${{ secrets.RELAY_SUPABASE_ANON_KEY }}
+        run: flutter build windows --release --dart-define=RELAY_SUPABASE_URL=${{ secrets.RELAY_SUPABASE_URL }} --dart-define=RELAY_SUPABASE_ANON_KEY=${{ secrets.RELAY_SUPABASE_ANON_KEY }}
 
       - name: Package zip
         shell: pwsh

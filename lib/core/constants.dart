@@ -15,7 +15,8 @@ class RelayConfig {
   static const String supabaseUrl = String.fromEnvironment('RELAY_SUPABASE_URL');
   static const String supabaseAnonKey = String.fromEnvironment('RELAY_SUPABASE_ANON_KEY');
 
-  static const bool hasBackendCredentials =
+  // A getter, not a const: String.isNotEmpty is not a constant expression.
+  static bool get hasBackendCredentials =>
       supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
 
   /// Web app the WebView auth flow runs against (signup / OTP / Continue with
