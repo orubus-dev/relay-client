@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme.dart';
 import '../../state/providers.dart';
+import 'developer_screen.dart';
 
 /// Profile — accent color + theme mode (icon follows the accent via themed
 /// adaptive icons), username with server-side availability checks, sign out.
@@ -160,6 +161,28 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
 
           const SizedBox(height: 28),
+
+          // developer
+          const Text('DEVELOPER', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.2, color: Colors.grey)),
+          const SizedBox(height: 8),
+          Card(
+            margin: EdgeInsets.zero,
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.code_rounded),
+                  title: const Text('Developer diagnostics', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                  subtitle: const Text('E2EE identity, local stores, session recovery', style: TextStyle(fontSize: 11)),
+                  trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(builder: (_) => const DeveloperScreen()),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
           OutlinedButton.icon(
             style: OutlinedButton.styleFrom(foregroundColor: Colors.redAccent),
             onPressed: () => ref.read(authControllerProvider.notifier).signOut(),

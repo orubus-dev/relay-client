@@ -10,6 +10,11 @@ class HiveCryptoStore implements CryptoStore {
   static const _identityBox = 'relay_e2ee_identity';
   static const _sessionsBox = 'relay_e2ee_sessions';
 
+  /// Public aliases — Profile → Developer reads these for store diagnostics
+  /// (session count / session reset) without touching private state.
+  static const String identityBoxName = _identityBox;
+  static const String sessionsBoxName = _sessionsBox;
+
   Box? _idBox;
   Box? _sessBox;
 

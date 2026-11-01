@@ -88,6 +88,28 @@ class LocalDb {
     return db;
   }
 
+  // ---------------- diagnostics (Profile → Developer) ----------------
+
+  /// Cached message rows (-1 when the DB is not open).
+  int messageCount() {
+    if (!isReady) return -1;
+    try {
+      return _d.select('SELECT COUNT(*) AS c FROM messages').first['c'] as int;
+    } catch (_) {
+      return -1;
+    }
+  }
+
+  /// Cached chat rows (-1 when the DB is not open).
+  int chatCount() {
+    if (!isReady) return -1;
+    try {
+      return _d.select('SELECT COUNT(*) AS c FROM chats').first['c'] as int;
+    } catch (_) {
+      return -1;
+    }
+  }
+
   // ---------------- chats ----------------
 
   void upsertChat(Map<String, Object?> chat) {

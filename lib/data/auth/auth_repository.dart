@@ -21,6 +21,13 @@ class AuthRepository {
   SupabaseClient? _client;
 
   SupabaseClient get client {
+    if (!RelayConfig.hasBackendCredentials) {
+      throw StateError(
+        'Relay built without backend credentials. Pass '
+        '--dart-define=RELAY_SUPABASE_URL=... and '
+        '--dart-define=RELAY_SUPABASE_ANON_KEY=... (see lib/core/constants.dart).',
+      );
+    }
     _client ??= SupabaseClient(RelayConfig.supabaseUrl, RelayConfig.supabaseAnonKey);
     return _client!;
   }

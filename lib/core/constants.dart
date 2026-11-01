@@ -3,9 +3,20 @@
  */
 class RelayConfig {
   /// Backend (same Supabase project as the web client — ciphertext-only).
-  static const String supabaseUrl = 'https://gobwknacvpgysmgpvzqt.supabase.co';
-  static const String supabaseAnonKey =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdvYndrbmFjdnBneXNtZ3B2enF0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwMTk5MzUsImV4cCI6MjA5NjU5NTkzNX0.1PsVy5VJiTr2vp7Qfj4zBEfBWHYrR6mvfqTkcZl48N4';
+  ///
+  /// Credentials are injected at BUILD time via --dart-define and never live
+  /// in the repository:
+  ///   --dart-define=RELAY_SUPABASE_URL=https://<ref>.supabase.co
+  ///   --dart-define=RELAY_SUPABASE_ANON_KEY=<anon key>
+  /// CI reads them from GitHub Actions secrets (RELAY_SUPABASE_URL /
+  /// RELAY_SUPABASE_ANON_KEY). The anon key is a public client credential and
+  /// still ends up in the compiled binary — keeping it out of git is repo
+  /// hygiene, not a security boundary; RLS is the boundary.
+  static const String supabaseUrl = String.fromEnvironment('RELAY_SUPABASE_URL');
+  static const String supabaseAnonKey = String.fromEnvironment('RELAY_SUPABASE_ANON_KEY');
+
+  static const bool hasBackendCredentials =
+      supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
 
   /// Web app the WebView auth flow runs against (signup / OTP / Continue with
   /// Google all handled there — zero native OAuth configuration needed).
@@ -18,6 +29,9 @@ class RelayConfig {
 
   static const String packageName = 'app.orubus.relay';
   static const String appName = 'Relay';
+
+  /// Keep in sync with pubspec.yaml `version:` — shown in Profile → Developer.
+  static const String appVersion = '1.0.11+1101';
 }
 
 /// E2EE wire-format constants — MUST match the web client exactly.
