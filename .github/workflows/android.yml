@@ -98,9 +98,7 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: flutter build appbundle --release \
-          --dart-define=RELAY_SUPABASE_URL=${{ secrets.RELAY_SUPABASE_URL }} \
-          --dart-define=RELAY_SUPABASE_ANON_KEY=${{ secrets.RELAY_SUPABASE_ANON_KEY }}
+        run: flutter build appbundle --release --dart-define=RELAY_SUPABASE_URL=${{ secrets.RELAY_SUPABASE_URL }} --dart-define=RELAY_SUPABASE_ANON_KEY=${{ secrets.RELAY_SUPABASE_ANON_KEY }}
 
       - name: Rename artifacts
         run: |
